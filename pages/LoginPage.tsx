@@ -29,7 +29,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) => {
         // This case handles API errors (e.g., network, server error)
         if (err instanceof Error) {
             if (err.message.includes("Failed to fetch")) {
-                setError("Login failed: Could not connect to the server. Please check your internet connection and ensure the backend script is deployed correctly.");
+                setError(
+`Login failed: Could not connect to the backend.
+
+Please check the following:
+1.  **Internet Connection:** Ensure you are connected to the internet.
+2.  **Backend URL:** Verify that the SCRIPT_URL in 'services/googleSheetsApi.ts' is correct.
+3.  **Apps Script Deployment:** Make sure your Google Apps Script is deployed correctly. If you've made recent changes, you must create a **new deployment** (Deploy > New deployment) and update the SCRIPT_URL with the new one. Ensure it's set to allow access for "Anyone".`
+                );
             } else {
                 setError(`Login failed:\n${err.message}`);
             }
