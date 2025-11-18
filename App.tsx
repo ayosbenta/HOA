@@ -68,7 +68,7 @@ const App: React.FC = () => {
     if (role === UserRole.HOMEOWNER) {
       return [
         ...commonItems,
-        { name: 'My Billing', icon: CreditCard },
+        { name: 'Billing', icon: CreditCard },
         { name: 'Visitors Pass', icon: ShieldCheck },
         { name: 'Amenities', icon: CalendarCheck },
       ];
@@ -91,7 +91,6 @@ const App: React.FC = () => {
         return <HomeownerDashboard />; // Fallback
       case 'Announcements':
         return <AnnouncementsPage />;
-      case 'My Billing':
       case 'Billing':
         return <BillingPage user={user}/>;
       case 'Visitors Pass':
