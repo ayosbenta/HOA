@@ -34,6 +34,49 @@
 
 const SS = SpreadsheetApp.getActiveSpreadsheet();
 
+// --- PERFORMANCE CACHING UTILITIES ---
+const CACHE = CacheService.getScriptCache();
+const CACHE_EXPIRATION_SECONDS = 300; // Cache data for 5 minutes
+
+// Generic function to get data from cache or fetch it if not present
+function getCached(key, fetchFunction) {
+  const cached = CACHE.get(key);
+  if (cached != null) {
+    Logger.log(`Cache HIT for key: ${key}`);
+    return JSON.parse(cached);
+  }
+  
+  Logger.log(`Cache MISS for key: ${key}. Fetching data.`);
+  const data = fetchFunction();
+  if (data) {
+    const jsonString = JSON.stringify(data);
+    CACHE.put(key, jsonString, CACHE_EXPIRATION_SECONDS);
+  }
+  return data;
+}
+
+// Function to clear a specific cache key
+function clearCache(key) {
+  Logger.log(`Clearing cache for key: ${key}`);
+  CACHE.remove(key);
+}
+
+// Centralized cache key definitions to prevent typos
+const CACHE_KEYS = {
+  ANNOUNCEMENTS: 'announcements',
+  ALL_DUES: 'all_dues',
+  ALL_VISITORS: 'all_visitors',
+  ADMIN_DASHBOARD: 'admin_dashboard',
+  ALL_USERS: 'all_users',
+  APP_SETTINGS: 'app_settings',
+  ALL_RESERVATIONS: 'all_reservations',
+  USER_DUES: (userId) => `dues_${userId}`,
+  USER_VISITORS: (homeownerId) => `visitors_${homeownerId}`,
+  USER_DASHBOARD: (userId) => `dashboard_${userId}`,
+  USER_RESERVATIONS: (userId) => `reservations_${userId}`,
+};
+
+
 function getSheetOrThrow(name) {
     const sheet = SS.getSheetByName(name);
     if (!sheet) {
@@ -61,39 +104,40 @@ function doGet(e) {
 
     let data;
 
+    // Use the caching layer for all GET requests
     switch (action) {
       case 'getAnnouncements':
-        data = getAnnouncements();
+        data = getCached(CACHE_KEYS.ANNOUNCEMENTS, getAnnouncements);
         break;
       case 'getDuesForUser':
-        data = getDuesForUser(e.parameter.userId);
+        data = getCached(CACHE_KEYS.USER_DUES(e.parameter.userId), () => getDuesForUser(e.parameter.userId));
         break;
       case 'getAllDues':
-        data = getAllDues();
+        data = getCached(CACHE_KEYS.ALL_DUES, getAllDues);
         break;
       case 'getVisitorsForHomeowner':
-        data = getVisitorsForHomeowner(e.parameter.homeownerId);
+        data = getCached(CACHE_KEYS.USER_VISITORS(e.parameter.homeownerId), () => getVisitorsForHomeowner(e.parameter.homeownerId));
         break;
       case 'getAllVisitors':
-        data = getAllVisitors();
+        data = getCached(CACHE_KEYS.ALL_VISITORS, getAllVisitors);
         break;
       case 'getHomeownerDashboardData':
-        data = getHomeownerDashboardData(e.parameter.userId);
+        data = getCached(CACHE_KEYS.USER_DASHBOARD(e.parameter.userId), () => getHomeownerDashboardData(e.parameter.userId));
         break;
       case 'getAdminDashboardData':
-        data = getAdminDashboardData();
+        data = getCached(CACHE_KEYS.ADMIN_DASHBOARD, getAdminDashboardData);
         break;
       case 'getAllUsers':
-        data = getAllUsers();
+        data = getCached(CACHE_KEYS.ALL_USERS, getAllUsers);
         break;
       case 'getAppSettings':
-        data = getAppSettings();
+        data = getCached(CACHE_KEYS.APP_SETTINGS, getAppSettings);
         break;
       case 'getAmenityReservationsForUser':
-        data = getAmenityReservationsForUser(e.parameter.userId);
+        data = getCached(CACHE_KEYS.USER_RESERVATIONS(e.parameter.userId), () => getAmenityReservationsForUser(e.parameter.userId));
         break;
       case 'getAllAmenityReservations':
-        data = getAllAmenityReservations();
+        data = getCached(CACHE_KEYS.ALL_RESERVATIONS, getAllAmenityReservations);
         break;
       default:
         return jsonResponse({ error: 'Invalid GET action: ' + action }, false);
@@ -124,36 +168,58 @@ function doPost(e) {
     Logger.log(JSON.stringify({type: 'POST', action: action, payload: payload}));
     let data;
 
+    // Invalidate relevant caches after data modification
     switch (action) {
       case 'login':
         data = login(payload);
         break;
       case 'register':
         data = register(payload);
+        clearCache(CACHE_KEYS.ALL_USERS);
+        clearCache(CACHE_KEYS.ADMIN_DASHBOARD);
         break;
       case 'updateUser':
         data = updateUser(payload);
+        clearCache(CACHE_KEYS.ALL_USERS);
+        clearCache(CACHE_KEYS.ADMIN_DASHBOARD);
         break;
       case 'updateAppSettings':
         data = updateAppSettings(payload.settings);
+        clearCache(CACHE_KEYS.APP_SETTINGS);
         break;
       case 'createVisitorPass':
         data = createVisitorPass(payload);
+        clearCache(CACHE_KEYS.ALL_VISITORS);
+        clearCache(CACHE_KEYS.USER_VISITORS(payload.homeownerId));
         break;
       case 'createAnnouncement':
         data = createAnnouncement(payload);
+        clearCache(CACHE_KEYS.ANNOUNCEMENTS);
+        clearCache(CACHE_KEYS.ADMIN_DASHBOARD);
+        // Note: Individual user dashboards with announcements might show stale data until cache expires.
         break;
       case 'createAmenityReservation':
         data = createAmenityReservation(payload);
+        clearCache(CACHE_KEYS.ALL_RESERVATIONS);
+        clearCache(CACHE_KEYS.USER_RESERVATIONS(payload.userId));
+        clearCache(CACHE_KEYS.ADMIN_DASHBOARD);
+        clearCache(CACHE_KEYS.USER_DASHBOARD(payload.userId));
         break;
       case 'updateAmenityReservationStatus':
         data = updateAmenityReservationStatus(payload);
+        clearCache(CACHE_KEYS.ALL_RESERVATIONS);
+        if (data && data.user_id) {
+          clearCache(CACHE_KEYS.USER_RESERVATIONS(data.user_id));
+          clearCache(CACHE_KEYS.USER_DASHBOARD(data.user_id));
+        }
+        clearCache(CACHE_KEYS.ADMIN_DASHBOARD);
         break;
       default:
         return jsonResponse({ error: 'Invalid POST action: ' + action }, false);
     }
     return jsonResponse(data);
-  } catch (error) {
+  } catch (error)
+  {
     Logger.log('doPost Error: ' + error.toString() + ' Stack: ' + error.stack);
     if (error instanceof SyntaxError) {
       return jsonResponse({ error: 'Failed to parse request body as JSON.', details: error.message }, false);
