@@ -14,11 +14,13 @@ import ManageRolesPage from './pages/ManageRolesPage';
 import FeeSchedulePage from './pages/FeeSchedulePage';
 import { UserRole } from './types';
 import { House, CreditCard, Users, ShieldCheck, Settings, Bell } from 'lucide-react';
+import RegistrationPage from './pages/RegistrationPage';
 
 const App: React.FC = () => {
   const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState('Dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [authPage, setAuthPage] = useState<'login' | 'register'>('login');
 
   if (loading) {
     return (
@@ -29,7 +31,10 @@ const App: React.FC = () => {
   }
 
   if (!user) {
-    return <LoginPage />;
+    if (authPage === 'login') {
+      return <LoginPage onNavigateToRegister={() => setAuthPage('register')} />;
+    }
+    return <RegistrationPage onNavigateToLogin={() => setAuthPage('login')} />;
   }
 
   const getNavItems = (role: UserRole) => {

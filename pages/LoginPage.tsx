@@ -4,7 +4,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { Building, UserCog, User as UserIcon, ShieldCheck } from 'lucide-react';
 import { UserRole } from '../types';
 
-const LoginPage: React.FC = () => {
+interface LoginPageProps {
+  onNavigateToRegister: () => void;
+}
+
+const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -58,7 +62,7 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-2xl shadow-lg">
         <div className="text-center">
             <div className="inline-block p-3 bg-brand-light rounded-full mb-4">
@@ -171,7 +175,7 @@ const LoginPage: React.FC = () => {
           </div>
           <p className="text-center text-sm text-gray-500">
             Don't have an account?{' '}
-            <a href="#" className="font-medium text-brand-primary hover:text-brand-secondary">
+            <a href="#" onClick={(e) => { e.preventDefault(); onNavigateToRegister(); }} className="font-medium text-brand-primary hover:text-brand-secondary">
               Request one
             </a>
           </p>

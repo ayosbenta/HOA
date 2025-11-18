@@ -116,6 +116,9 @@ function doPost(e) {
       case 'login':
         data = login(payload);
         break;
+      case 'register':
+        data = register(payload);
+        break;
       case 'updateUserRole':
         data = updateUserRole(payload.userId, payload.newRole);
         break;
@@ -153,7 +156,7 @@ function login({ email, password }) {
   
   Logger.log(`Attempting login for email: ${email}`);
   const usersSheet = getSheetOrThrow("Users");
-  const users = sheetToJSON(usersSheet, ['user_id', 'email', 'password_hash', 'full_name', 'role']);
+  const users = sheetToJSON(usersSheet);
   
   const user = users.find(u => String(u.email).trim().toLowerCase() === String(email).trim().toLowerCase());
   
@@ -162,9 +165,13 @@ function login({ email, password }) {
     return null;
   }
 
-  Logger.log(`User found: ${user.full_name}. Comparing passwords.`);
+  Logger.log(`User found: ${user.full_name}. Comparing passwords and status.`);
   
   if (String(user.password_hash).trim() === String(password).trim()) {
+    if (user.status !== 'active') {
+      Logger.log(`Login failed: User account status is "${user.status}".`);
+      throw new Error(`Your account is currently ${user.status}. Please contact the administrator.`);
+    }
     Logger.log(`Login successful for user: ${user.full_name}`);
     const { password_hash, ...userClientData } = user;
     return userClientData;
@@ -172,6 +179,41 @@ function login({ email, password }) {
     Logger.log(`Login failed: Password mismatch for user: ${user.full_name}.`);
     return null;
   }
+}
+
+function register(payload) {
+    const { fullName, email, phone, block, lot, password } = payload;
+    if (!fullName || !email || !phone || !block || !lot || !password) {
+        throw new Error('All registration fields are required.');
+    }
+
+    const usersSheet = getSheetOrThrow("Users");
+    const users = sheetToJSON(usersSheet, ['email']); 
+
+    const existingUser = users.find(u => String(u.email).trim().toLowerCase() === String(email).trim().toLowerCase());
+    if (existingUser) {
+        throw new Error('An account with this email address already exists.');
+    }
+
+    const newUserId = 'user_' + new Date().getTime();
+    const today = new Date().toISOString();
+
+    const newUserRow = [
+        newUserId,          // user_id
+        'Homeowner',        // role
+        fullName,           // full_name
+        email,              // email
+        phone,              // phone
+        block,              // block
+        lot,                // lot
+        password,           // password_hash
+        'pending',          // status
+        today               // date_created
+    ];
+
+    usersSheet.appendRow(newUserRow);
+
+    return { message: 'Registration successful! Your account is pending approval by the administrator.' };
 }
 
 function getAnnouncements() {
@@ -346,7 +388,7 @@ function setupMockData() {
   // === Set up Announcements sheet ===
   const announcementsHeaders = ['ann_id', 'title', 'content', 'image_url', 'created_by', 'created_at', 'audience'];
   const announcementsData = [
-    ['ann_001', 'Community Octoberfest Party!', 'Join us for a night of fun, food, and music at the clubhouse this coming October 30th at 7 PM. Please RSVP by October 25th.', 'https://images.unsplash.com/photo-1570592801226-f793616f7433?q=80&w=2070&auto=format&fit=crop', 'Admin User', '2023-10-15T10:00:00Z', 'all'],
+    ['ann_001', 'Community Octoberfest Party!', 'Join us for a night of fun, food, and music at the clubhouse this coming October 30th at 7 PM. Please RSVP by October 25th.', 'https://images.unsplash.com/photo-1570592801226-f793616f7433?q=80&w=2070&auto=format&fit=crop', 'Admin User', '203-10-15T10:00:00Z', 'all'],
     ['ann_002', 'Quarterly Pest Control Schedule', 'The quarterly pest control will be conducted on November 5th. Please ensure someone is home to grant access to our accredited pest control provider.', null, 'Admin User', '2023-10-10T14:30:00Z', 'all']
   ];
   announcementsSheet.getRange(1, 1, 1, announcementsHeaders.length).setValues([announcementsHeaders]).setFontWeight('bold');

@@ -15,6 +15,16 @@ interface AppSettings {
     gcashQrCode: string | null;
 }
 
+export interface RegistrationPayload {
+    fullName: string;
+    email: string;
+    phone: string;
+    block: string;
+    lot: string;
+    password: string;
+}
+
+
 const handleApiResponse = async (response: Response) => {
     // fix: Removed dead code block that checks for a placeholder SCRIPT_URL.
     // The URL is now configured, making the check and its mock logic obsolete.
@@ -42,6 +52,16 @@ export const apiLogin = async (email: string, password: string): Promise<User | 
     });
     return handleApiResponse(response);
 };
+
+export const apiRegister = async (payload: RegistrationPayload): Promise<{ message: string }> => {
+    const response = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'register', payload }),
+    });
+    return handleApiResponse(response);
+};
+
 
 export const apiLogout = (): void => {
     // Logout is a client-side action (clearing session storage)
