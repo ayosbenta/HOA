@@ -4,7 +4,11 @@ import { Upload, Trash2, Banknote, Users, Bell, DollarSign, Edit, CheckCircle } 
 
 const QR_CODE_STORAGE_KEY = 'hoa-gcash-qrcode';
 
-const SettingsPage: React.FC = () => {
+interface SettingsPageProps {
+    onNavigate: (page: string) => void;
+}
+
+const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
     const [savedQrCode, setSavedQrCode] = useState<string | null>(null);
     const [previewQrCode, setPreviewQrCode] = useState<string | null>(null);
     const [isDirty, setIsDirty] = useState(false);
@@ -137,8 +141,10 @@ const SettingsPage: React.FC = () => {
                     </h3>
                 </div>
                 <div className="p-6">
-                    <p className="text-sm text-gray-500">Manage what different user roles can see and do within the app. (Feature coming soon)</p>
-                     <button className="mt-4 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-500 bg-gray-200 cursor-not-allowed">
+                    <p className="text-sm text-gray-500">Manage what different user roles can see and do within the app.</p>
+                     <button 
+                        onClick={() => onNavigate('Manage Roles')}
+                        className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-brand-primary hover:bg-brand-dark focus:outline-none">
                         Manage Roles
                     </button>
                 </div>
@@ -152,8 +158,10 @@ const SettingsPage: React.FC = () => {
                     </h3>
                 </div>
                 <div className="p-6">
-                    <p className="text-sm text-gray-500">Set the monthly association dues and configure penalties for late payments. (Feature coming soon)</p>
-                     <button className="mt-4 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-500 bg-gray-200 cursor-not-allowed">
+                    <p className="text-sm text-gray-500">Set the monthly association dues and configure penalties for late payments.</p>
+                     <button 
+                        onClick={() => onNavigate('Fee Schedule')}
+                        className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-brand-primary hover:bg-brand-dark focus:outline-none">
                         Configure Fees
                     </button>
                 </div>

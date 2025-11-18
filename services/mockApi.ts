@@ -1,8 +1,9 @@
 import { User, UserRole, Announcement, Due, Visitor } from '../types';
 
 // --- MOCK DATABASE ---
+const FEE_SCHEDULE_KEY = 'hoa-fee-schedule';
 
-const mockUsers: User[] = [
+let mockUsers: User[] = [
   {
     user_id: 'user-admin-01',
     role: UserRole.ADMIN,
@@ -35,6 +36,17 @@ const mockUsers: User[] = [
     lot: 0,
     status: 'active',
     date_created: '2023-01-10T08:00:00Z',
+  },
+   {
+    user_id: 'user-owner-02',
+    role: UserRole.HOMEOWNER,
+    full_name: 'Jane Smith',
+    email: 'jane.smith@home.com',
+    phone: '111-222-3333',
+    block: 8,
+    lot: 3,
+    status: 'active',
+    date_created: '2023-03-20T12:00:00Z',
   },
 ];
 
@@ -88,7 +100,7 @@ const mockDues: Due[] = [
   },
   {
     due_id: 'due-003',
-    user_id: 'user-owner-02', // some other user for admin view
+    user_id: 'user-owner-02',
     billing_month: 'October 2023',
     amount: 2500,
     penalty: 0,
@@ -195,5 +207,48 @@ export const getHomeownerDashboardData = async (userId: string): Promise<{ dues:
     return simulateApiCall({
         dues: dues,
         announcements: announcements.slice(0, 2) // Return only the latest 2 announcements for dashboard
+    });
+};
+
+// --- New API functions for Settings ---
+
+export const getAllUsers = (): Promise<User[]> => {
+    return simulateApiCall(mockUsers);
+};
+
+export const updateUserRole = (userId: string, newRole: UserRole): Promise<User> => {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            const userIndex = mockUsers.findIndex(u => u.user_id === userId);
+            if (userIndex > -1) {
+                mockUsers[userIndex].role = newRole;
+                resolve(JSON.parse(JSON.stringify(mockUsers[userIndex])));
+            } else {
+                reject(new Error("User not found"));
+            }
+        }, 300);
+    });
+};
+
+export const getFeeSchedule = (): Promise<{ monthlyDue: number, penalty: number }> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            const storedFees = localStorage.getItem(FEE_SCHEDULE_KEY);
+            if (storedFees) {
+                resolve(JSON.parse(storedFees));
+            } else {
+                // Default values if not set
+                resolve({ monthlyDue: 2500, penalty: 250 });
+            }
+        }, 200);
+    });
+};
+
+export const updateFeeSchedule = (newSchedule: { monthlyDue: number, penalty: number }): Promise<{ monthlyDue: number, penalty: number }> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            localStorage.setItem(FEE_SCHEDULE_KEY, JSON.stringify(newSchedule));
+            resolve(newSchedule);
+        }, 300);
     });
 };

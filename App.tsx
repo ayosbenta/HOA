@@ -9,9 +9,11 @@ import StaffDashboard from './pages/StaffDashboard';
 import AnnouncementsPage from './pages/AnnouncementsPage';
 import BillingPage from './pages/BillingPage';
 import VisitorsPage from './pages/VisitorsPage';
-import SettingsPage from './pages/SettingsPage'; // Import the new SettingsPage
+import SettingsPage from './pages/SettingsPage';
+import ManageRolesPage from './pages/ManageRolesPage';
+import FeeSchedulePage from './pages/FeeSchedulePage';
 import { UserRole } from './types';
-import { House, Building, Bell, CreditCard, Users, ShieldCheck, LogOut, Settings } from 'lucide-react';
+import { House, CreditCard, Users, ShieldCheck, Settings, Bell } from 'lucide-react';
 
 const App: React.FC = () => {
   const { user, loading } = useAuth();
@@ -42,7 +44,7 @@ const App: React.FC = () => {
         { name: 'Billing', icon: CreditCard },
         { name: 'Members', icon: Users },
         { name: 'Visitors Log', icon: ShieldCheck },
-        { name: 'Settings', icon: Settings }, // Add Settings for Admin
+        { name: 'Settings', icon: Settings },
       ];
     }
 
@@ -54,7 +56,6 @@ const App: React.FC = () => {
       ];
     }
     
-    // Default for Staff/Security
     return [
         { name: 'Dashboard', icon: House },
         { name: 'Visitors Log', icon: ShieldCheck },
@@ -78,8 +79,12 @@ const App: React.FC = () => {
       case 'Visitors Pass':
       case 'Visitors Log':
         return <VisitorsPage user={user} />;
-      case 'Settings': // Render SettingsPage
-        return <SettingsPage />;
+      case 'Settings':
+        return <SettingsPage onNavigate={setCurrentPage} />;
+      case 'Manage Roles':
+        return <ManageRolesPage />;
+      case 'Fee Schedule':
+        return <FeeSchedulePage />;
       default:
         if (user.role === UserRole.ADMIN) return <AdminDashboard />;
         if (user.role === UserRole.STAFF) return <StaffDashboard />;
