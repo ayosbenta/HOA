@@ -22,6 +22,9 @@
 // Sheet: Dues
 // Columns: due_id, user_id, billing_month, amount, penalty, total_due, status, notes
 //
+// Sheet: Payments
+// Columns: payment_id, due_id, user_id, amount, method, proof_url, status, date_paid, notes
+//
 // Sheet: Visitors
 // Columns: visitor_id, homeowner_id, name, vehicle, date, time_in, time_out, qr_code, status
 //
@@ -50,7 +53,12 @@ function getCached(key, fetchFunction) {
   const data = fetchFunction();
   if (data) {
     const jsonString = JSON.stringify(data);
-    CACHE.put(key, jsonString, CACHE_EXPIRATION_SECONDS);
+    // Check if the data is too large for the cache (100KB limit)
+    if (jsonString.length < 100 * 1024) {
+      CACHE.put(key, jsonString, CACHE_EXPIRATION_SECONDS);
+    } else {
+      Logger.log(`Cache SKIPPED for key: ${key}. Data size (${jsonString.length} bytes) exceeds cache limit.`);
+    }
   }
   return data;
 }
@@ -148,7 +156,10 @@ function doGet(e) {
           
           // Now, create a version for the cache that excludes the large QR code.
           const { gcashQrCode, ...settingsToCache } = allSettings;
-          CACHE.put(CACHE_KEYS.APP_SETTINGS, JSON.stringify(settingsToCache), CACHE_EXPIRATION_SECONDS);
+          const jsonStringToCache = JSON.stringify(settingsToCache);
+           if (jsonStringToCache.length < 100 * 1024) {
+             CACHE.put(CACHE_KEYS.APP_SETTINGS, jsonStringToCache, CACHE_EXPIRATION_SECONDS);
+           }
         }
         break;
       case 'getAmenityReservationsForUser':
@@ -183,7 +194,7 @@ function doPost(e) {
     const request = JSON.parse(e.postData.contents);
     const action = request.action;
     const payload = request.payload;
-    Logger.log(JSON.stringify({type: 'POST', action: action, payload: payload}));
+    Logger.log(JSON.stringify({type: 'POST', action: action, payload: payload ? Object.keys(payload) : null})); // Don't log payload value in case it's sensitive
     let data;
 
     // Invalidate relevant caches after data modification
@@ -215,6 +226,18 @@ function doPost(e) {
         clearCache(CACHE_KEYS.ANNOUNCEMENTS);
         clearCache(CACHE_KEYS.ADMIN_DASHBOARD);
         // Note: Individual user dashboards with announcements might show stale data until cache expires.
+        break;
+      case 'submitPayment':
+        data = submitPayment(payload);
+        clearCache(CACHE_KEYS.ALL_DUES);
+        clearCache(CACHE_KEYS.USER_DUES(payload.userId));
+        break;
+      case 'updatePaymentStatus':
+        data = updatePaymentStatus(payload);
+        clearCache(CACHE_KEYS.ALL_DUES);
+        if (data && data.user_id) {
+          clearCache(CACHE_KEYS.USER_DUES(data.user_id));
+        }
         break;
       case 'createAmenityReservation':
         data = createAmenityReservation(payload);
@@ -358,13 +381,40 @@ function createAnnouncement(payload) {
 
 function getDuesForUser(userId) {
   const duesSheet = getSheetOrThrow("Dues");
+  const paymentsSheet = getSheetOrThrow("Payments");
+
   const allDues = sheetToJSON(duesSheet, ['due_id', 'user_id']);
-  return allDues.filter(due => due.user_id === userId);
+  const allPayments = sheetToJSON(paymentsSheet, ['payment_id', 'due_id']);
+  
+  const userDues = allDues.filter(due => due.user_id === userId);
+
+  const duesWithPayments = userDues.map(due => {
+      const duePayments = allPayments.filter(p => p.due_id === due.due_id).sort((a, b) => new Date(b.date_paid) - new Date(a.date_paid));
+      return {
+          ...due,
+          payment: duePayments.length > 0 ? duePayments[0] : null
+      };
+  });
+
+  return duesWithPayments;
 }
 
 function getAllDues() {
     const duesSheet = getSheetOrThrow("Dues");
-    return sheetToJSON(duesSheet, ['due_id', 'user_id']);
+    const paymentsSheet = getSheetOrThrow("Payments");
+
+    const allDues = sheetToJSON(duesSheet, ['due_id', 'user_id']);
+    const allPayments = sheetToJSON(paymentsSheet, ['payment_id', 'due_id']);
+
+    const duesWithPayments = allDues.map(due => {
+        const duePayments = allPayments.filter(p => p.due_id === due.due_id).sort((a, b) => new Date(b.date_paid) - new Date(a.date_paid));
+        return {
+            ...due,
+            payment: duePayments.length > 0 ? duePayments[0] : null
+        };
+    });
+
+    return duesWithPayments;
 }
 
 function getVisitorsForHomeowner(homeownerId) {
@@ -570,6 +620,86 @@ function updateAppSettings(newSettings) {
     return getAppSettings();
 }
 
+function submitPayment(payload) {
+  const { dueId, userId, amount, method, proofUrl } = payload;
+  if (!dueId || !userId || !amount || !method || !proofUrl) {
+    throw new Error("Missing required fields for payment submission.");
+  }
+
+  const paymentsSheet = getSheetOrThrow("Payments");
+  const headers = paymentsSheet.getRange(1, 1, 1, paymentsSheet.getLastColumn()).getValues()[0];
+
+  const newPaymentId = 'pay_' + new Date().getTime();
+  const newPayment = {
+    payment_id: newPaymentId,
+    due_id: dueId,
+    user_id: userId,
+    amount: amount,
+    method: method,
+    proof_url: proofUrl,
+    status: 'pending',
+    date_paid: new Date().toISOString(),
+    notes: ''
+  };
+
+  const newRow = headers.map(header => newPayment[String(header).trim()] !== undefined ? newPayment[String(header).trim()] : null);
+  paymentsSheet.appendRow(newRow);
+
+  return newPayment;
+}
+
+function updatePaymentStatus(payload) {
+  const { paymentId, status, notes } = payload;
+  if (!paymentId || !status) {
+    throw new Error("Payment ID and new status are required.");
+  }
+
+  const paymentsSheet = getSheetOrThrow("Payments");
+  const paymentsData = paymentsSheet.getDataRange().getValues();
+  const paymentsHeaders = paymentsData[0];
+  const paymentIdIndex = paymentsHeaders.indexOf('payment_id');
+  const paymentRowIndex = paymentsData.findIndex(row => row[paymentIdIndex] === paymentId);
+
+  if (paymentRowIndex === -1) {
+    throw new Error("Payment not found.");
+  }
+  
+  const paymentRow = paymentsData[paymentRowIndex];
+  const paymentObj = paymentsHeaders.reduce((obj, header, i) => {
+    obj[header] = paymentRow[i];
+    return obj;
+  }, {});
+
+
+  // Update payment status
+  const statusIndex = paymentsHeaders.indexOf('status');
+  paymentsSheet.getRange(paymentRowIndex + 1, statusIndex + 1).setValue(status);
+  
+  if (notes) {
+      const notesIndex = paymentsHeaders.indexOf('notes');
+      paymentsSheet.getRange(paymentRowIndex + 1, notesIndex + 1).setValue(notes);
+  }
+
+  // If approved, update the corresponding due
+  if (status === 'verified') {
+    const dueId = paymentObj.due_id;
+    const duesSheet = getSheetOrThrow("Dues");
+    const duesData = duesSheet.getDataRange().getValues();
+    const duesHeaders = duesData[0];
+    const dueIdIndex = duesHeaders.indexOf('due_id');
+    const dueRowIndex = duesData.findIndex(row => row[dueIdIndex] === dueId);
+
+    if (dueRowIndex !== -1) {
+      const dueStatusIndex = duesHeaders.indexOf('status');
+      duesSheet.getRange(dueRowIndex + 1, dueStatusIndex + 1).setValue('paid');
+    }
+  }
+
+  // Return the full payment object for context
+  return paymentObj;
+}
+
+
 // --- AMENITY RESERVATION FUNCTIONS ---
 
 function createAmenityReservation(payload) {
@@ -695,6 +825,7 @@ function setupMockData() {
   const usersSheet = getOrCreateSheet("Users");
   const announcementsSheet = getOrCreateSheet("Announcements");
   const duesSheet = getOrCreateSheet("Dues");
+  const paymentsSheet = getOrCreateSheet("Payments");
   const visitorsSheet = getOrCreateSheet("Visitors");
   const settingsSheet = getOrCreateSheet("Settings");
   const amenityReservationsSheet = getOrCreateSheet("Amenity Reservations");
@@ -741,6 +872,18 @@ function setupMockData() {
   }
   duesSheet.setFrozenRows(1);
   
+   // === Set up Payments sheet ===
+  const paymentsHeaders = ['payment_id', 'due_id', 'user_id', 'amount', 'method', 'proof_url', 'status', 'date_paid', 'notes'];
+  const paymentsData = [
+    ['pay_001', 'due_002', 'user_002', 2000, 'GCash', 'https://i.imgur.com/gQnL3f6.png', 'verified', '2023-09-15T10:00:00Z', ''],
+    ['pay_002', 'due_004', 'user_003', 2000, 'GCash', 'https://i.imgur.com/gQnL3f6.png', 'verified', '2023-09-14T11:00:00Z', '']
+  ];
+  paymentsSheet.getRange(1, 1, 1, paymentsHeaders.length).setValues([paymentsHeaders]).setFontWeight('bold');
+  if (paymentsData.length > 0) {
+    paymentsSheet.getRange(2, 1, paymentsData.length, paymentsData[0].length).setValues(paymentsData);
+  }
+  paymentsSheet.setFrozenRows(1);
+
   // === Set up Visitors sheet ===
   const visitorsHeaders = ['visitor_id', 'homeowner_id', 'name', 'vehicle', 'date', 'time_in', 'time_out', 'qr_code', 'status'];
   const visitorsData = [

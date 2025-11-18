@@ -44,6 +44,7 @@ export interface Due {
   total_due: number;
   status: 'paid' | 'unpaid' | 'overdue';
   notes?: string;
+  payment?: Payment | null; // Associated payment
 }
 
 export interface Payment {
@@ -53,8 +54,9 @@ export interface Payment {
   amount: number;
   method: 'GCash' | 'Maya' | 'Bank Transfer' | 'Credit Card';
   proof_url: string;
-  status: 'verified' | 'pending';
+  status: 'verified' | 'pending' | 'rejected';
   date_paid: string;
+  notes?: string; // For rejection reason
 }
 
 export interface Visitor {

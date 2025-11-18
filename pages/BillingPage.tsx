@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../components/ui/Card';
-import PaymentModal from '../components/modals/PaymentModal'; // Import the modal
+import PaymentModal from '../components/modals/PaymentModal';
+import ReceiptModal from '../components/modals/ReceiptModal';
 import { getDuesForUser, getAllDues } from '../services/googleSheetsApi';
 import { Due, User, UserRole } from '../types';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, AlertTriangle } from 'lucide-react';
+import Tooltip from '../components/ui/Tooltip';
 
 interface BillingPageProps {
   user: User;
@@ -12,52 +14,59 @@ interface BillingPageProps {
 const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
   const [dues, setDues] = useState<Due[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [selectedDue, setSelectedDue] = useState<Due | null>(null);
 
-  useEffect(() => {
-    const fetchDues = async () => {
-      setLoading(true);
-      try {
-        const data = user.role === UserRole.ADMIN 
-          ? await getAllDues()
-          : await getDuesForUser(user.user_id);
-        setDues(data);
-      } catch (error) {
-        console.error('Failed to fetch dues', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDues();
+  const fetchDues = useCallback(async () => {
+    // Keep modals from closing during refetch, but still show loading state in table
+    setLoading(true);
+    try {
+      const data = user.role === UserRole.ADMIN 
+        ? await getAllDues()
+        : await getDuesForUser(user.user_id);
+      setDues(data);
+    } catch (error) {
+      console.error('Failed to fetch dues', error);
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
+
+  useEffect(() => {
+    fetchDues();
+  }, [fetchDues]);
 
   const handlePayNowClick = (due: Due) => {
     setSelectedDue(due);
-    setIsModalOpen(true);
+    setIsPaymentModalOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleViewReceiptClick = (due: Due) => {
+    setSelectedDue(due);
+    setIsReceiptModalOpen(true);
+  };
+  
+  const handlePaymentSuccess = () => {
+    setIsPaymentModalOpen(false);
     setSelectedDue(null);
+    fetchDues();
   };
 
-  const handlePaymentSubmit = (proof: File) => {
-    // In a real app, you would upload the file and update the payment status.
-    // For this demo, we'll just log it and show an alert.
-    console.log('Submitting payment proof:', proof.name, 'for due:', selectedDue?.due_id);
-    alert(`Payment proof for ${selectedDue?.billing_month} submitted! It will be reviewed by the admin.`);
-    
-    // Optimistically update the UI
-    if (selectedDue) {
-        setDues(dues.map(d => d.due_id === selectedDue.due_id ? { ...d, status: 'paid' } : d)); // This is a mock update, a real app would refetch
+  const handleModalUpdate = () => {
+    setIsReceiptModalOpen(false);
+    setSelectedDue(null);
+    fetchDues();
+  };
+
+  const getStatusChip = (due: Due) => {
+    if (due.payment?.status === 'pending') {
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Pending Verification</span>;
     }
-
-    handleCloseModal();
-  };
-
-  const getStatusChip = (status: 'paid' | 'unpaid' | 'overdue') => {
-    switch (status) {
+     if (due.payment?.status === 'rejected') {
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">Payment Rejected</span>;
+    }
+    switch (due.status) {
       case 'paid':
         return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Paid</span>;
       case 'unpaid':
@@ -69,7 +78,47 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
     }
   };
 
-  const isHomeowner = user.role === UserRole.HOMEOWNER;
+  const renderActionCell = (due: Due) => {
+    const isHomeowner = user.role === UserRole.HOMEOWNER;
+    const isAdmin = user.role === UserRole.ADMIN;
+    const { payment } = due;
+
+    // Homeowner's View
+    if (isHomeowner) {
+        if (due.status === 'paid') {
+            return <button onClick={() => handleViewReceiptClick(due)} className="font-medium text-brand-primary hover:underline text-xs">View Receipt</button>;
+        }
+        if (payment?.status === 'pending') {
+            return <button disabled className="font-medium text-gray-400 cursor-not-allowed px-3 py-1 rounded-md text-xs">Payment Pending</button>;
+        }
+        if (payment?.status === 'rejected') {
+            return (
+                <div className="flex items-center gap-2">
+                    <button onClick={() => handlePayNowClick(due)} className="font-medium text-white bg-orange-500 hover:bg-orange-600 px-3 py-1 rounded-md text-xs">Resubmit</button>
+                    <Tooltip text={`Reason: ${payment.notes || 'No reason provided.'}`}>
+                        <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    </Tooltip>
+                </div>
+            )
+        }
+        return <button onClick={() => handlePayNowClick(due)} className="font-medium text-white bg-brand-primary hover:bg-brand-dark px-3 py-1 rounded-md text-xs">Pay Now</button>;
+    }
+
+    // Admin's View
+    if (isAdmin) {
+        if (payment?.status === 'verified' || due.status === 'paid') {
+            return <button onClick={() => handleViewReceiptClick(due)} className="font-medium text-brand-primary hover:underline text-xs">View Receipt</button>;
+        }
+        if (payment?.status === 'pending') {
+            return <button onClick={() => handleViewReceiptClick(due)} className="font-medium text-white bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded-md text-xs">Review Payment</button>;
+        }
+        if (payment?.status === 'rejected') {
+            return <span className="font-medium text-orange-600 text-xs">Rejected</span>;
+        }
+        return <span className="text-gray-500 text-xs">Unpaid</span>;
+    }
+    return null;
+  }
 
   return (
     <>
@@ -82,7 +131,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
           {user.role === UserRole.ADMIN && <button className="px-4 py-2 text-sm bg-brand-primary text-white font-semibold rounded-lg hover:bg-brand-dark transition-colors">Export as PDF</button>}
         </div>
         <div className="overflow-x-auto">
-          {loading ? (
+          {loading && dues.length === 0 ? (
               <div className="text-center p-8">Loading billing information...</div>
           ) : (
               <table className="w-full text-sm text-left text-gray-500">
@@ -90,32 +139,23 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
                   <tr>
                       <th scope="col" className="px-6 py-3">Billing Month</th>
                       {user.role === UserRole.ADMIN && <th scope="col" className="px-6 py-3">Homeowner</th>}
-                      <th scope="col" className="px-6 py-3">Amount</th>
-                      <th scope="col" className="px-6 py-3">Penalty</th>
                       <th scope="col" className="px-6 py-3">Total Due</th>
                       <th scope="col" className="px-6 py-3">Status</th>
                       <th scope="col" className="px-6 py-3">Action</th>
                   </tr>
               </thead>
               <tbody>
+                  {loading && dues.length > 0 && (
+                      <tr><td colSpan={5} className="text-center p-4 text-sm text-gray-500">Refreshing data...</td></tr>
+                  )}
                   {dues.map((due) => (
                       <tr key={due.due_id} className="bg-white border-b hover:bg-gray-50">
                           <td className="px-6 py-4 font-medium text-gray-900">{due.billing_month}</td>
                           {user.role === UserRole.ADMIN && <td className="px-6 py-4">User {due.user_id.slice(0,5)}</td>}
-                          <td className="px-6 py-4">₱{due.amount.toFixed(2)}</td>
-                          <td className="px-6 py-4">₱{due.penalty.toFixed(2)}</td>
                           <td className="px-6 py-4 font-bold">₱{due.total_due.toFixed(2)}</td>
-                          <td className="px-6 py-4">{getStatusChip(due.status)}</td>
+                          <td className="px-6 py-4">{getStatusChip(due)}</td>
                           <td className="px-6 py-4">
-                              {(due.status === 'unpaid' || due.status === 'overdue') && isHomeowner ? (
-                                  <button onClick={() => handlePayNowClick(due)} className="font-medium text-white bg-brand-primary hover:bg-brand-dark px-3 py-1 rounded-md text-xs">
-                                      Pay Now
-                                  </button>
-                              ) : (
-                                  <button className="font-medium text-gray-400 cursor-not-allowed text-xs">
-                                      View Receipt
-                                  </button>
-                              )}
+                            {renderActionCell(due)}
                           </td>
                       </tr>
                   ))}
@@ -125,10 +165,17 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
         </div>
       </Card>
       <PaymentModal 
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
         due={selectedDue}
-        onSubmit={handlePaymentSubmit}
+        onSuccess={handlePaymentSuccess}
+      />
+      <ReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => setIsReceiptModalOpen(false)}
+        due={selectedDue}
+        user={user}
+        onUpdate={handleModalUpdate}
       />
     </>
   );

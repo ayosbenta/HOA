@@ -1,20 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, UploadCloud, FileText } from 'lucide-react';
-import { getAppSettings } from '../../services/googleSheetsApi';
+import { getAppSettings, submitPayment } from '../../services/googleSheetsApi';
 import { Due } from '../../types';
 
 interface PaymentModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSubmit: (proof: File) => void;
+    onSuccess: () => void;
     due: Due | null;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onSubmit, due }) => {
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
+};
+
+const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onSuccess, due }) => {
     const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
     const [loadingQr, setLoadingQr] = useState(true);
     const [paymentProof, setPaymentProof] = useState<File | null>(null);
     const [error, setError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -36,6 +46,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onSubmit, 
             // Reset state on open
             setPaymentProof(null);
             setError('');
+            setIsSubmitting(false);
         }
     }, [isOpen]);
 
@@ -57,13 +68,34 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onSubmit, 
         fileInputRef.current?.click();
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!paymentProof) {
             setError('Please upload proof of payment.');
             return;
         }
-        onSubmit(paymentProof);
+        if (!due) {
+            setError('Associated due not found.');
+            return;
+        }
+
+        setError('');
+        setIsSubmitting(true);
+        try {
+            const proofUrl = await fileToBase64(paymentProof);
+            await submitPayment({
+                dueId: due.due_id,
+                userId: due.user_id,
+                amount: due.total_due,
+                method: 'GCash',
+                proofUrl: proofUrl,
+            });
+            onSuccess(); // Triggers refetch on parent page
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -150,8 +182,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onSubmit, 
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
                             Cancel
                         </button>
-                        <button type="submit" disabled={!qrCodeUrl} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary border border-transparent rounded-md hover:bg-brand-dark disabled:bg-gray-400 disabled:cursor-not-allowed">
-                            Submit Payment
+                        <button type="submit" disabled={!qrCodeUrl || isSubmitting} className="w-36 px-4 py-2 text-sm font-medium text-white bg-brand-primary border border-transparent rounded-md hover:bg-brand-dark disabled:bg-gray-400 disabled:cursor-not-allowed flex justify-center">
+                           {isSubmitting ? (
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                'Submit Payment'
+                            )}
                         </button>
                     </div>
                 </form>

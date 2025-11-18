@@ -1,4 +1,4 @@
-import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData, AnnouncementPayload } from '../types';
+import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData, AnnouncementPayload, Payment } from '../types';
 
 // IMPORTANT: Replace this with your own Google Apps Script Web App URL
 // 1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/1VVSb9V6vLcG97GV6uu7Z0-ok0tfoJh13-V5OLOgzw3I/edit
@@ -39,6 +39,20 @@ export interface AmenityReservationPayload {
     startTime: string;
     endTime: string;
     notes: string;
+}
+
+export interface PaymentPayload {
+    dueId: string;
+    userId: string;
+    amount: number;
+    method: 'GCash';
+    proofUrl: string; // base64 encoded image
+}
+
+export interface UpdatePaymentStatusPayload {
+    paymentId: string;
+    status: Payment['status'];
+    notes?: string;
 }
 
 
@@ -154,6 +168,24 @@ export const createVisitorPass = (payload: VisitorPayload): Promise<Visitor> => 
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'createVisitorPass', payload }),
+    });
+    return response.then(handleApiResponse);
+};
+
+export const submitPayment = (payload: PaymentPayload): Promise<Payment> => {
+     const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'submitPayment', payload }),
+    });
+    return response.then(handleApiResponse);
+};
+
+export const updatePaymentStatus = (payload: UpdatePaymentStatusPayload): Promise<Payment> => {
+     const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'updatePaymentStatus', payload }),
     });
     return response.then(handleApiResponse);
 };
