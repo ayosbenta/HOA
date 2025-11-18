@@ -617,6 +617,10 @@ function updateAppSettings(newSettings) {
             settingsSheet.appendRow([key, newSettings[key]]);
         }
     });
+    
+    // Ensure all pending changes are written before reading again to prevent race conditions.
+    SpreadsheetApp.flush(); 
+
     return getAppSettings();
 }
 
