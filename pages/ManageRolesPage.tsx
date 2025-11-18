@@ -1,15 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Card from '../components/ui/Card';
 import { getAllUsers, updateUser } from '../services/googleSheetsApi';
 import { User, UserRole } from '../types';
 import { Users, CheckCircle } from 'lucide-react';
 
-const ManageRolesPage: React.FC = () => {
+interface ManageRolesPageProps {
+    viewUserId?: string | null;
+    onViewComplete: () => void;
+}
+
+const ManageRolesPage: React.FC<ManageRolesPageProps> = ({ viewUserId, onViewComplete }) => {
     const [users, setUsers] = useState<User[]>([]);
     const [originalUsers, setOriginalUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [savingStatus, setSavingStatus] = useState<{[key: string]: boolean}>({});
     const [successStatus, setSuccessStatus] = useState<{[key: string]: boolean}>({});
+    const rowRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
 
     useEffect(() => {
         const fetchUsers = async () => {
@@ -26,6 +32,30 @@ const ManageRolesPage: React.FC = () => {
         };
         fetchUsers();
     }, []);
+
+    useEffect(() => {
+        if (viewUserId && users.length > 0) {
+            const userRow = rowRefs.current[viewUserId];
+            if (userRow) {
+                userRow.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                });
+                userRow.classList.add('bg-brand-light', 'transition-all', 'duration-1000');
+                setTimeout(() => {
+                    userRow.classList.remove('bg-brand-light');
+                }, 3000); // Highlight for 3 seconds
+            }
+        }
+        
+        // When component unmounts or dependencies change, call onViewComplete to reset the state in App.tsx
+        return () => {
+            if (viewUserId) {
+                onViewComplete();
+            }
+        };
+    }, [viewUserId, users, onViewComplete]);
+
 
     const handleRoleChange = (userId: string, newRole: UserRole) => {
         setUsers(users.map(user => user.user_id === userId ? { ...user, role: newRole } : user));
@@ -102,7 +132,11 @@ const ManageRolesPage: React.FC = () => {
                                 const hasChanged = originalUser?.role !== user.role || originalUser?.status !== user.status;
 
                                 return (
-                                <tr key={user.user_id} className="bg-white border-b hover:bg-gray-50">
+                                <tr 
+                                    key={user.user_id} 
+                                    ref={el => { rowRefs.current[user.user_id] = el; }}
+                                    className="bg-white border-b hover:bg-gray-50"
+                                >
                                     <td className="px-6 py-4 font-medium text-gray-900">{user.full_name}</td>
                                     <td className="px-6 py-4">{user.email}</td>
                                     <td className="px-6 py-4">{`B${user.block} L${user.lot}`}</td>

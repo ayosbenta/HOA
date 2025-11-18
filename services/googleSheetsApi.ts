@@ -1,4 +1,4 @@
-import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData } from '../types';
+import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData, AnnouncementPayload } from '../types';
 
 // IMPORTANT: Replace this with your own Google Apps Script Web App URL
 // 1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/1VVSb9V6vLcG97GV6uu7Z0-ok0tfoJh13-V5OLOgzw3I/edit
@@ -86,6 +86,15 @@ export const apiLogout = (): void => {
 
 export const getAnnouncements = (): Promise<Announcement[]> => {
     return fetch(`${SCRIPT_URL}?action=getAnnouncements`).then(handleApiResponse);
+};
+
+export const createAnnouncement = (payload: AnnouncementPayload): Promise<Announcement> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'createAnnouncement', payload }),
+    });
+    return response.then(handleApiResponse);
 };
 
 export const getDuesForUser = (userId: string): Promise<Due[]> => {

@@ -27,6 +27,14 @@ export interface Announcement {
   audience: 'all' | UserRole[];
 }
 
+export interface AnnouncementPayload {
+  title: string;
+  content: string;
+  image_url?: string;
+  created_by: string; // user's full_name
+  audience: 'all' | UserRole;
+}
+
 export interface Due {
   due_id: string;
   user_id: string;

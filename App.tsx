@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('Dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [authPage, setAuthPage] = useState<'login' | 'register'>('login');
+  const [viewItemId, setViewItemId] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -37,6 +38,15 @@ const App: React.FC = () => {
     }
     return <RegistrationPage onNavigateToLogin={() => setAuthPage('login')} />;
   }
+
+  const handleViewApproval = (item: { id: string; type: string }) => {
+    setViewItemId(item.id);
+    if (item.type === 'New Member') {
+      setCurrentPage('Manage Roles');
+    } else if (item.type.startsWith('Amenity')) {
+      setCurrentPage('Amenities');
+    }
+  };
 
   const getNavItems = (role: UserRole) => {
     const commonItems = [
@@ -75,7 +85,7 @@ const App: React.FC = () => {
   const renderPage = () => {
     switch (currentPage) {
       case 'Dashboard':
-        if (user.role === UserRole.ADMIN) return <AdminDashboard />;
+        if (user.role === UserRole.ADMIN) return <AdminDashboard onViewApproval={handleViewApproval} onNavigate={setCurrentPage} />;
         if (user.role === UserRole.HOMEOWNER) return <HomeownerDashboard />;
         if (user.role === UserRole.STAFF) return <StaffDashboard />;
         return <HomeownerDashboard />; // Fallback
@@ -88,15 +98,15 @@ const App: React.FC = () => {
       case 'Visitors Log':
         return <VisitorsPage user={user} />;
       case 'Amenities':
-        return <AmenitiesPage user={user} />;
+        return <AmenitiesPage user={user} viewReservationId={viewItemId} onViewComplete={() => setViewItemId(null)} />;
       case 'Settings':
         return <SettingsPage onNavigate={setCurrentPage} />;
       case 'Manage Roles':
-        return <ManageRolesPage />;
+        return <ManageRolesPage viewUserId={viewItemId} onViewComplete={() => setViewItemId(null)} />;
       case 'Fee Schedule':
         return <FeeSchedulePage />;
       default:
-        if (user.role === UserRole.ADMIN) return <AdminDashboard />;
+        if (user.role === UserRole.ADMIN) return <AdminDashboard onViewApproval={handleViewApproval} onNavigate={setCurrentPage} />;
         if (user.role === UserRole.STAFF) return <StaffDashboard />;
         return <HomeownerDashboard />;
     }

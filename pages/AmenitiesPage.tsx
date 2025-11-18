@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Card from '../components/ui/Card';
 import {
     getAmenityReservationsForUser,
@@ -12,13 +12,16 @@ import { CalendarPlus, List, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 interface AmenitiesPageProps {
     user: User;
+    viewReservationId?: string | null;
+    onViewComplete: () => void;
 }
 
-const AmenitiesPage: React.FC<AmenitiesPageProps> = ({ user }) => {
+const AmenitiesPage: React.FC<AmenitiesPageProps> = ({ user, viewReservationId, onViewComplete }) => {
     const [reservations, setReservations] = useState<AmenityReservation[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
+    const rowRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
 
     const isHomeowner = user.role === UserRole.HOMEOWNER;
     const isAdmin = user.role === UserRole.ADMIN;
@@ -49,6 +52,29 @@ const AmenitiesPage: React.FC<AmenitiesPageProps> = ({ user }) => {
     useEffect(() => {
         fetchReservations();
     }, [fetchReservations]);
+
+    useEffect(() => {
+        if (viewReservationId && reservations.length > 0) {
+            const reservationRow = rowRefs.current[viewReservationId];
+            if (reservationRow) {
+                reservationRow.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                });
+                reservationRow.classList.add('bg-brand-light', 'transition-all', 'duration-1000');
+                setTimeout(() => {
+                    reservationRow.classList.remove('bg-brand-light');
+                }, 3000);
+            }
+        }
+
+        return () => {
+            if (viewReservationId) {
+                onViewComplete();
+            }
+        };
+    }, [viewReservationId, reservations, onViewComplete]);
+
 
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -178,7 +204,10 @@ const AmenitiesPage: React.FC<AmenitiesPageProps> = ({ user }) => {
                                      <tr><td colSpan={isAdmin ? 6 : 5} className="text-center p-8 text-gray-500">No reservations found.</td></tr>
                                 ) : (
                                     reservations.map((r) => (
-                                        <tr key={r.reservation_id} className="bg-white border-b hover:bg-gray-50">
+                                        <tr 
+                                            key={r.reservation_id} 
+                                            ref={el => { rowRefs.current[r.reservation_id] = el; }}
+                                            className="bg-white border-b hover:bg-gray-50">
                                             {isAdmin && <td className="px-6 py-4 font-medium text-gray-900">{r.full_name}</td>}
                                             <td className="px-6 py-4 font-medium text-gray-900">{r.amenity_name}</td>
                                             <td className="px-6 py-4">{new Date(r.reservation_date).toLocaleDateString()}</td>

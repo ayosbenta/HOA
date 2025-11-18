@@ -140,6 +140,9 @@ function doPost(e) {
       case 'createVisitorPass':
         data = createVisitorPass(payload);
         break;
+      case 'createAnnouncement':
+        data = createAnnouncement(payload);
+        break;
       case 'createAmenityReservation':
         data = createAmenityReservation(payload);
         break;
@@ -241,6 +244,32 @@ function getAnnouncements() {
   const required = ['ann_id', 'title', 'content', 'created_by', 'created_at'];
   const announcementsSheet = getSheetOrThrow("Announcements");
   return sheetToJSON(announcementsSheet, required).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+function createAnnouncement(payload) {
+    const { title, content, image_url, created_by, audience } = payload;
+    if (!title || !content || !created_by || !audience) {
+        throw new Error("Title, content, creator, and audience are required to create an announcement.");
+    }
+
+    const sheet = getSheetOrThrow("Announcements");
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    const newId = 'ann_' + new Date().getTime();
+    const newAnnouncement = {
+        ann_id: newId,
+        title: title,
+        content: content,
+        image_url: image_url || null,
+        created_by: created_by,
+        created_at: new Date().toISOString(),
+        audience: audience,
+    };
+
+    const newRow = headers.map(header => newAnnouncement[String(header).trim()] !== undefined ? newAnnouncement[String(header).trim()] : null);
+    sheet.appendRow(newRow);
+
+    return newAnnouncement;
 }
 
 function getDuesForUser(userId) {
