@@ -1,0 +1,108 @@
+import React, { useState } from 'react';
+import { useAuth } from './contexts/AuthContext';
+import LoginPage from './pages/LoginPage';
+import Sidebar from './components/layout/Sidebar';
+import Header from './components/layout/Header';
+import AdminDashboard from './pages/AdminDashboard';
+import HomeownerDashboard from './pages/HomeownerDashboard';
+import StaffDashboard from './pages/StaffDashboard';
+import AnnouncementsPage from './pages/AnnouncementsPage';
+import BillingPage from './pages/BillingPage';
+import VisitorsPage from './pages/VisitorsPage';
+import { UserRole } from './types';
+import { House, Building, Bell, CreditCard, Users, ShieldCheck, LogOut } from 'lucide-react';
+
+const App: React.FC = () => {
+  const { user, loading } = useAuth();
+  const [currentPage, setCurrentPage] = useState('Dashboard');
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  const getNavItems = (role: UserRole) => {
+    const commonItems = [
+      { name: 'Dashboard', icon: House },
+      { name: 'Announcements', icon: Bell },
+    ];
+
+    if (role === UserRole.ADMIN) {
+      return [
+        ...commonItems,
+        { name: 'Billing', icon: CreditCard },
+        { name: 'Members', icon: Users },
+        { name: 'Visitors Log', icon: ShieldCheck },
+      ];
+    }
+
+    if (role === UserRole.HOMEOWNER) {
+      return [
+        ...commonItems,
+        { name: 'My Billing', icon: CreditCard },
+        { name: 'Visitors Pass', icon: ShieldCheck },
+      ];
+    }
+    
+    // Default for Staff/Security
+    return [
+        { name: 'Dashboard', icon: House },
+        { name: 'Visitors Log', icon: ShieldCheck },
+    ]
+  };
+  
+  const navItems = getNavItems(user.role);
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'Dashboard':
+        if (user.role === UserRole.ADMIN) return <AdminDashboard />;
+        if (user.role === UserRole.HOMEOWNER) return <HomeownerDashboard />;
+        if (user.role === UserRole.STAFF) return <StaffDashboard />;
+        return <HomeownerDashboard />; // Fallback
+      case 'Announcements':
+        return <AnnouncementsPage />;
+      case 'My Billing':
+      case 'Billing':
+        return <BillingPage user={user}/>;
+      case 'Visitors Pass':
+      case 'Visitors Log':
+        return <VisitorsPage user={user} />;
+      default:
+        if (user.role === UserRole.ADMIN) return <AdminDashboard />;
+        if (user.role === UserRole.STAFF) return <StaffDashboard />;
+        return <HomeownerDashboard />;
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-100">
+      <Sidebar 
+        navItems={navItems}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        isOpen={isSidebarOpen}
+        setIsOpen={setSidebarOpen}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header 
+          pageTitle={currentPage}
+          toggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
+        />
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 md:p-6 lg:p-8">
+          {renderPage()}
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default App;
