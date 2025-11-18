@@ -519,7 +519,8 @@ function getAppSettings() {
     const appSettings = {
         monthlyDue: 0,
         penalty: 0,
-        gcashQrCode: null
+        gcashQrCode: null,
+        effectiveDate: ''
     };
     settings.forEach(setting => {
         if (setting.key in appSettings) {
@@ -740,7 +741,8 @@ function setupMockData() {
   const settingsData = [
       ['monthlyDue', '2000'],
       ['penalty', '100'],
-      ['gcashQrCode', '']
+      ['gcashQrCode', ''],
+      ['effectiveDate', '2023-01-01']
   ];
   settingsSheet.getRange(1, 1, 1, settingsHeaders.length).setValues([settingsHeaders]).setFontWeight('bold');
   if (settingsData.length > 0) {

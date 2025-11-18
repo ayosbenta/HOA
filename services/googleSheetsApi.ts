@@ -13,6 +13,7 @@ interface AppSettings {
     monthlyDue: number;
     penalty: number;
     gcashQrCode: string | null;
+    effectiveDate?: string;
 }
 
 export interface RegistrationPayload {
