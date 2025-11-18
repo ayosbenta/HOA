@@ -381,10 +381,12 @@ function createAnnouncement(payload) {
 
 function getDuesForUser(userId) {
   const duesSheet = getSheetOrThrow("Dues");
-  const paymentsSheet = getSheetOrThrow("Payments");
+  // fix: Safely get the Payments sheet without throwing an error if it's missing.
+  const paymentsSheet = SS.getSheetByName("Payments");
 
   const allDues = sheetToJSON(duesSheet, ['due_id', 'user_id']);
-  const allPayments = sheetToJSON(paymentsSheet, ['payment_id', 'due_id']);
+  // fix: If the Payments sheet doesn't exist, treat the payments list as empty.
+  const allPayments = paymentsSheet ? sheetToJSON(paymentsSheet, ['payment_id', 'due_id']) : [];
   
   const userDues = allDues.filter(due => due.user_id === userId);
 
@@ -401,10 +403,12 @@ function getDuesForUser(userId) {
 
 function getAllDues() {
     const duesSheet = getSheetOrThrow("Dues");
-    const paymentsSheet = getSheetOrThrow("Payments");
+    // fix: Safely get the Payments sheet without throwing an error if it's missing.
+    const paymentsSheet = SS.getSheetByName("Payments");
 
     const allDues = sheetToJSON(duesSheet, ['due_id', 'user_id']);
-    const allPayments = sheetToJSON(paymentsSheet, ['payment_id', 'due_id']);
+    // fix: If the Payments sheet doesn't exist, treat the payments list as empty.
+    const allPayments = paymentsSheet ? sheetToJSON(paymentsSheet, ['payment_id', 'due_id']) : [];
 
     const duesWithPayments = allDues.map(due => {
         const duePayments = allPayments.filter(p => p.due_id === due.due_id).sort((a, b) => new Date(b.date_paid) - new Date(a.date_paid));
