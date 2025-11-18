@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
-import { getAnnouncements } from '../services/mockApi';
+import { getAnnouncements } from '../services/googleSheetsApi';
 import { Announcement } from '../types';
 import { Megaphone } from 'lucide-react';
 
@@ -11,6 +11,7 @@ const AnnouncementsPage: React.FC = () => {
     useEffect(() => {
         const fetchAnnouncements = async () => {
             try {
+                setLoading(true);
                 const data = await getAnnouncements();
                 setAnnouncements(data);
             } catch (error) {

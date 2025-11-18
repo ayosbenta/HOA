@@ -42,7 +42,7 @@ const App: React.FC = () => {
       return [
         ...commonItems,
         { name: 'Billing', icon: CreditCard },
-        { name: 'Members', icon: Users },
+        { name: 'Manage Roles', icon: Users },
         { name: 'Visitors Log', icon: ShieldCheck },
         { name: 'Settings', icon: Settings },
       ];

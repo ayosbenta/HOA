@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
-import { getHomeownerDashboardData } from '../services/mockApi';
+import { getHomeownerDashboardData } from '../services/googleSheetsApi';
 import { Announcement, Due } from '../types';
-import { DollarSign, FileText, Bell, Users, BarChart2, AlertCircle } from 'lucide-react';
+import { DollarSign, Bell, AlertCircle } from 'lucide-react';
 
 const HomeownerDashboard: React.FC = () => {
     const { user } = useAuth();
@@ -15,6 +15,7 @@ const HomeownerDashboard: React.FC = () => {
         const fetchData = async () => {
             if (user) {
                 try {
+                    setLoading(true);
                     const data = await getHomeownerDashboardData(user.user_id);
                     setDues(data.dues);
                     setAnnouncements(data.announcements);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, UploadCloud, FileText } from 'lucide-react';
+import { getAppSettings } from '../../services/googleSheetsApi';
 import { Due } from '../../types';
 
 interface PaymentModalProps {
@@ -9,18 +10,29 @@ interface PaymentModalProps {
     due: Due | null;
 }
 
-const QR_CODE_STORAGE_KEY = 'hoa-gcash-qrcode';
-
 const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onSubmit, due }) => {
     const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+    const [loadingQr, setLoadingQr] = useState(true);
     const [paymentProof, setPaymentProof] = useState<File | null>(null);
     const [error, setError] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (isOpen) {
-            const storedQrCode = localStorage.getItem(QR_CODE_STORAGE_KEY);
-            setQrCodeUrl(storedQrCode);
+            const fetchQrCode = async () => {
+                setLoadingQr(true);
+                try {
+                    const settings = await getAppSettings();
+                    setQrCodeUrl(settings.gcashQrCode);
+                } catch (error) {
+                    console.error("Failed to fetch QR code", error);
+                    setQrCodeUrl(null);
+                } finally {
+                    setLoadingQr(false);
+                }
+            };
+
+            fetchQrCode();
             // Reset state on open
             setPaymentProof(null);
             setError('');
@@ -81,16 +93,18 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onSubmit, 
                                 <li>Upload the screenshot as proof of payment.</li>
                             </ol>
                         </div>
-
-                        {qrCodeUrl ? (
-                            <div className="flex justify-center">
+                        
+                        <div className="flex justify-center items-center h-56">
+                            {loadingQr ? (
+                                <div className="w-8 h-8 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
+                            ) : qrCodeUrl ? (
                                 <img src={qrCodeUrl} alt="G-Cash QR Code" className="w-56 h-56 object-contain rounded-lg border" />
-                            </div>
-                        ) : (
-                            <div className="text-center p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
-                                G-Cash QR code is not available. Please contact the admin office for payment instructions.
-                            </div>
-                        )}
+                            ) : (
+                                <div className="text-center p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
+                                    G-Cash QR code is not available. Please contact the admin office for payment instructions.
+                                </div>
+                            )}
+                        </div>
                         
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Upload Proof of Payment</label>

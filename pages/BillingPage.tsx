@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
 import PaymentModal from '../components/modals/PaymentModal'; // Import the modal
-import { getDuesForUser, getAllDues } from '../services/mockApi';
+import { getDuesForUser, getAllDues } from '../services/googleSheetsApi';
 import { Due, User, UserRole } from '../types';
 import { CreditCard } from 'lucide-react';
 

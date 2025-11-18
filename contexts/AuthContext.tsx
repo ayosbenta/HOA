@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
 import { User } from '../types';
-import { apiLogin, apiLogout } from '../services/mockApi';
+import { apiLogin, apiLogout } from '../services/googleSheetsApi';
 
 interface AuthContextType {
   user: User | null;
@@ -41,7 +41,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return null;
     } catch (error) {
       console.error("Login failed:", error);
-      return null;
+      // Let the login page handle displaying the error
+      throw error;
     } finally {
       setLoading(false);
     }

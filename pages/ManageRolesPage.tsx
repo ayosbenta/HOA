@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
-import { getAllUsers, updateUserRole } from '../services/mockApi';
+import { getAllUsers, updateUserRole } from '../services/googleSheetsApi';
 import { User, UserRole } from '../types';
 import { Users, CheckCircle } from 'lucide-react';
 
 const ManageRolesPage: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
+    const [originalUsers, setOriginalUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [savingStatus, setSavingStatus] = useState<{[key: string]: boolean}>({});
     const [successStatus, setSuccessStatus] = useState<{[key: string]: boolean}>({});
@@ -16,6 +17,7 @@ const ManageRolesPage: React.FC = () => {
             try {
                 const data = await getAllUsers();
                 setUsers(data);
+                setOriginalUsers(JSON.parse(JSON.stringify(data))); // Deep copy for checking changes
             } catch (error) {
                 console.error("Failed to fetch users", error);
             } finally {
@@ -29,17 +31,26 @@ const ManageRolesPage: React.FC = () => {
         setUsers(users.map(user => user.user_id === userId ? { ...user, role: newRole } : user));
     };
 
-    const handleSaveChanges = async (userId: string, newRole: UserRole) => {
+    const handleSaveChanges = async (userId: string) => {
+        const userToUpdate = users.find(u => u.user_id === userId);
+        if (!userToUpdate) return;
+        
         setSavingStatus(prev => ({ ...prev, [userId]: true }));
         try {
-            await updateUserRole(userId, newRole);
+            await updateUserRole(userId, userToUpdate.role);
+            
+            // Update original user state to reflect saved change
+            setOriginalUsers(prev => prev.map(u => u.user_id === userId ? { ...userToUpdate } : u));
+            
             setSuccessStatus(prev => ({...prev, [userId]: true}));
             setTimeout(() => {
                 setSuccessStatus(prev => ({...prev, [userId]: false}));
             }, 2000);
         } catch (error) {
             console.error("Failed to update user role", error);
-            // Here you might want to show an error toast
+            alert(`Error: Could not update role for ${userToUpdate.full_name}.`);
+            // Revert UI change on failure
+            setUsers(originalUsers);
         } finally {
             setSavingStatus(prev => ({ ...prev, [userId]: false }));
         }
@@ -68,7 +79,11 @@ const ManageRolesPage: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {users.map(user => (
+                            {users.map((user, index) => {
+                                const originalUser = originalUsers.find(u => u.user_id === user.user_id);
+                                const hasChanged = originalUser?.role !== user.role;
+
+                                return (
                                 <tr key={user.user_id} className="bg-white border-b hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium text-gray-900">{user.full_name}</td>
                                     <td className="px-6 py-4">{user.email}</td>
@@ -86,9 +101,9 @@ const ManageRolesPage: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4">
                                         <button 
-                                            onClick={() => handleSaveChanges(user.user_id, user.role)}
-                                            disabled={savingStatus[user.user_id]}
-                                            className="w-24 text-center font-medium text-white bg-brand-primary hover:bg-brand-dark px-3 py-2 rounded-md text-xs disabled:bg-gray-400"
+                                            onClick={() => handleSaveChanges(user.user_id)}
+                                            disabled={savingStatus[user.user_id] || !hasChanged}
+                                            className="w-24 text-center font-medium text-white bg-brand-primary hover:bg-brand-dark px-3 py-2 rounded-md text-xs disabled:bg-gray-400 disabled:cursor-not-allowed"
                                         >
                                             {savingStatus[user.user_id] ? (
                                                 <div className="w-4 h-4 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -100,7 +115,7 @@ const ManageRolesPage: React.FC = () => {
                                         </button>
                                     </td>
                                 </tr>
-                            ))}
+                            )})}
                         </tbody>
                     </table>
                 )}

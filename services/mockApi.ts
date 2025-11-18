@@ -1,254 +1,83 @@
-import { User, UserRole, Announcement, Due, Visitor } from '../types';
+import { User, Announcement, Due, Visitor, UserRole } from '../types';
 
-// --- MOCK DATABASE ---
-const FEE_SCHEDULE_KEY = 'hoa-fee-schedule';
+const today = new Date().toISOString();
 
-let mockUsers: User[] = [
-  {
-    user_id: 'user-admin-01',
-    role: UserRole.ADMIN,
-    full_name: 'Admin User',
-    email: 'admin@hoa.com',
-    phone: '123-456-7890',
-    block: 1,
-    lot: 1,
-    status: 'active',
-    date_created: '2023-01-01T10:00:00Z',
-  },
-  {
-    user_id: 'user-owner-01',
-    role: UserRole.HOMEOWNER,
-    full_name: 'John Doe',
-    email: 'john.doe@home.com',
-    phone: '098-765-4321',
-    block: 5,
-    lot: 12,
-    status: 'active',
-    date_created: '2023-02-15T11:30:00Z',
-  },
-  {
-    user_id: 'user-staff-01',
-    role: UserRole.STAFF,
-    full_name: 'Security Guard',
-    email: 'staff@hoa.com',
-    phone: '555-555-5555',
-    block: 0,
-    lot: 0,
-    status: 'active',
-    date_created: '2023-01-10T08:00:00Z',
-  },
-   {
-    user_id: 'user-owner-02',
-    role: UserRole.HOMEOWNER,
-    full_name: 'Jane Smith',
-    email: 'jane.smith@home.com',
-    phone: '111-222-3333',
-    block: 8,
-    lot: 3,
-    status: 'active',
-    date_created: '2023-03-20T12:00:00Z',
-  },
+const mockUsers: User[] = [
+    { user_id: 'user_001', role: UserRole.ADMIN, full_name: 'Admin User', email: 'admin@hoa.com', phone: '09171234567', block: 1, lot: 1, status: 'active', date_created: today },
+    { user_id: 'user_002', role: UserRole.HOMEOWNER, full_name: 'John Doe', email: 'john.doe@home.com', phone: '09181234567', block: 5, lot: 12, status: 'active', date_created: today },
+    { user_id: 'user_003', role: UserRole.HOMEOWNER, full_name: 'Jane Smith', email: 'jane.smith@home.com', phone: '09191234567', block: 8, lot: 2, status: 'active', date_created: today },
+    { user_id: 'user_004', role: UserRole.STAFF, full_name: 'Security Guard', email: 'staff@hoa.com', phone: '09201234567', block: 0, lot: 0, status: 'active', date_created: today },
 ];
 
 const mockAnnouncements: Announcement[] = [
-    {
-      ann_id: 'ann-001',
-      title: 'Community Town Hall Meeting',
-      content: 'Join us for a town hall meeting on October 30th at 7 PM in the clubhouse to discuss the upcoming holiday events and budget for next year. Your participation is highly encouraged!',
-      image_url: 'https://images.unsplash.com/photo-1561494226-54f420551a4a?q=80&w=2070&auto=format&fit=crop',
-      created_by: 'Admin User',
-      created_at: '2023-10-25T09:00:00Z',
-      audience: 'all',
-    },
-    {
-      ann_id: 'ann-002',
-      title: 'Annual Pest Control Schedule',
-      content: 'The annual pest control service is scheduled for the first week of November. Please check the detailed schedule for your block and ensure you provide access to the service team.',
-      created_by: 'Admin User',
-      created_at: '2023-10-22T14:20:00Z',
-      audience: 'all',
-    },
-    {
-      ann_id: 'ann-003',
-      title: 'Swimming Pool Maintenance',
-      content: 'The community swimming pool will be closed for maintenance from November 5th to November 7th. We apologize for any inconvenience this may cause.',
-      image_url: 'https://images.unsplash.com/photo-1575059802216-9524552b2847?q=80&w=1974&auto=format&fit=crop',
-      created_by: 'Admin User',
-      created_at: '2023-10-20T11:00:00Z',
-      audience: 'all',
-    }
+    { ann_id: 'ann_001', title: 'Community Octoberfest Party!', content: 'Join us for a night of fun, food, and music at the clubhouse this coming October 30th at 7 PM. Please RSVP by October 25th.', image_url: 'https://images.unsplash.com/photo-1570592801226-f793616f7433?q=80&w=2070&auto=format&fit=crop', created_by: 'Admin User', created_at: '2023-10-15T10:00:00Z', audience: 'all' },
+    { ann_id: 'ann_002', title: 'Quarterly Pest Control Schedule', content: 'The quarterly pest control will be conducted on November 5th. Please ensure someone is home to grant access to our accredited pest control provider.', created_by: 'Admin User', created_at: '2023-10-10T14:30:00Z', audience: 'all' }
 ];
 
 const mockDues: Due[] = [
-  {
-    due_id: 'due-001',
-    user_id: 'user-owner-01',
-    billing_month: 'October 2023',
-    amount: 2500,
-    penalty: 250,
-    total_due: 2750,
-    status: 'overdue',
-  },
-  {
-    due_id: 'due-002',
-    user_id: 'user-owner-01',
-    billing_month: 'September 2023',
-    amount: 2500,
-    penalty: 0,
-    total_due: 2500,
-    status: 'paid',
-  },
-  {
-    due_id: 'due-003',
-    user_id: 'user-owner-02',
-    billing_month: 'October 2023',
-    amount: 2500,
-    penalty: 0,
-    total_due: 2500,
-    status: 'unpaid',
-  },
-  {
-    due_id: 'due-004',
-    user_id: 'user-owner-03',
-    billing_month: 'October 2023',
-    amount: 3000,
-    penalty: 0,
-    total_due: 3000,
-    status: 'paid',
-  }
+    { due_id: 'due_001', user_id: 'user_002', billing_month: 'October 2023', amount: 2000, penalty: 100, total_due: 2100, status: 'overdue' },
+    { due_id: 'due_002', user_id: 'user_002', billing_month: 'September 2023', amount: 2000, penalty: 0, total_due: 2000, status: 'paid', notes: 'Paid via GCash' },
+    { due_id: 'due_003', user_id: 'user_003', billing_month: 'October 2023', amount: 2000, penalty: 0, total_due: 2000, status: 'unpaid' },
+    { due_id: 'due_004', user_id: 'user_003', billing_month: 'September 2023', amount: 2000, penalty: 0, total_due: 2000, status: 'paid' }
 ];
 
 const mockVisitors: Visitor[] = [
-    {
-      visitor_id: 'vis-001',
-      homeowner_id: 'user-owner-01',
-      name: 'Jane Smith',
-      vehicle: 'ABC 123',
-      date: '2023-10-28',
-      time_in: null,
-      time_out: null,
-      qr_code: 'qr-code-string-1',
-      status: 'expected',
-    },
-    {
-      visitor_id: 'vis-002',
-      homeowner_id: 'user-owner-01',
-      name: 'Peter Jones',
-      vehicle: '',
-      date: '2023-10-27',
-      time_in: '10:05:12',
-      time_out: '11:30:45',
-      qr_code: 'qr-code-string-2',
-      status: 'exited',
-    },
-    {
-        visitor_id: 'vis-003',
-        homeowner_id: 'user-owner-02',
-        name: 'Contractor Work',
-        vehicle: 'XYZ 789',
-        date: '2023-10-28',
-        time_in: '09:00:00',
-        time_out: null,
-        qr_code: 'qr-code-string-3',
-        status: 'entered',
-    }
+    { visitor_id: 'vis_001', homeowner_id: 'user_002', name: 'Maria Dela Cruz', vehicle: 'ABC 123', date: '2023-10-28', time_in: '10:00 AM', time_out: null, qr_code: 'qr_code_string_1', status: 'expected' },
+    { visitor_id: 'vis_002', homeowner_id: 'user_002', name: 'Peter Pan', vehicle: '', date: '2023-10-27', time_in: '2:00 PM', time_out: '4:00 PM', qr_code: 'qr_code_string_2', status: 'exited' },
+    { visitor_id: 'vis_003', homeowner_id: 'user_003', name: 'Juan Tamad', vehicle: 'XYZ 789', date: '2023-10-29', time_in: null, time_out: null, qr_code: 'qr_code_string_3', status: 'expected' }
 ];
 
-// --- API FUNCTIONS ---
-
-const simulateApiCall = <T>(data: T, delay = 500): Promise<T> => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve(JSON.parse(JSON.stringify(data))); // Deep copy to prevent mutation
-        }, delay);
-    });
+const mockSettings = {
+    monthlyDue: 2000,
+    penalty: 100,
+    gcashQrCode: '' // Initially empty, to be uploaded via UI
 };
 
-export const apiLogin = async (email: string, password: string): Promise<User | null> => {
-    console.log(`Attempting login for email: ${email}`);
+
+// Mock API functions
+export const mockLogin = (email: string, password: string): Promise<User | null> => {
     const user = mockUsers.find(u => u.email === email);
-    // In a real app, you'd check the password hash
-    if (user && password === 'password') { // Simple password check for mock
-        return simulateApiCall(user);
+    // In a real mock, you'd check a mock password. Here we simplify.
+    if (user && ((user.role === UserRole.ADMIN && password === 'admin') || password === 'password')) {
+        return Promise.resolve(user);
     }
-    return simulateApiCall(null);
+    return Promise.resolve(null);
 };
 
-export const apiLogout = (): void => {
-    console.log("User logged out");
-    // No server call needed for this mock
+export const getMockAnnouncements = (): Promise<Announcement[]> => Promise.resolve(mockAnnouncements);
+
+export const getMockDuesForUser = (userId: string): Promise<Due[]> => {
+    return Promise.resolve(mockDues.filter(d => d.user_id === userId));
 };
 
-export const getAnnouncements = (): Promise<Announcement[]> => {
-    return simulateApiCall(mockAnnouncements.sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+export const getMockAllDues = (): Promise<Due[]> => Promise.resolve(mockDues);
+
+export const getMockVisitorsForHomeowner = (homeownerId: string): Promise<Visitor[]> => {
+    return Promise.resolve(mockVisitors.filter(v => v.homeowner_id === homeownerId));
 };
 
-export const getDuesForUser = (userId: string): Promise<Due[]> => {
-    const userDues = mockDues.filter(due => due.user_id === userId);
-    return simulateApiCall(userDues);
+export const getMockAllVisitors = (): Promise<Visitor[]> => Promise.resolve(mockVisitors);
+
+export const getMockHomeownerDashboardData = (userId: string): Promise<{ dues: Due[], announcements: Announcement[] }> => {
+    const dues = mockDues.filter(d => d.user_id === userId);
+    const announcements = mockAnnouncements.slice(0, 3);
+    return Promise.resolve({ dues, announcements });
 };
 
-export const getAllDues = (): Promise<Due[]> => {
-    return simulateApiCall(mockDues);
-}
+export const getMockAllUsers = (): Promise<User[]> => Promise.resolve(mockUsers);
 
-export const getVisitorsForHomeowner = (homeownerId: string): Promise<Visitor[]> => {
-    const userVisitors = mockVisitors.filter(v => v.homeowner_id === homeownerId);
-    return simulateApiCall(userVisitors);
+export const getMockAppSettings = (): Promise<typeof mockSettings> => Promise.resolve(mockSettings);
+
+export const updateMockUserRole = (userId: string, newRole: UserRole): Promise<User> => {
+    const userIndex = mockUsers.findIndex(u => u.user_id === userId);
+    if (userIndex > -1) {
+        mockUsers[userIndex].role = newRole;
+        return Promise.resolve(mockUsers[userIndex]);
+    }
+    return Promise.reject('User not found');
 };
 
-export const getAllVisitors = (): Promise<Visitor[]> => {
-    return simulateApiCall(mockVisitors);
-};
-
-export const getHomeownerDashboardData = async (userId: string): Promise<{ dues: Due[], announcements: Announcement[] }> => {
-    const dues = await getDuesForUser(userId);
-    const announcements = await getAnnouncements();
-    return simulateApiCall({
-        dues: dues,
-        announcements: announcements.slice(0, 2) // Return only the latest 2 announcements for dashboard
-    });
-};
-
-// --- New API functions for Settings ---
-
-export const getAllUsers = (): Promise<User[]> => {
-    return simulateApiCall(mockUsers);
-};
-
-export const updateUserRole = (userId: string, newRole: UserRole): Promise<User> => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            const userIndex = mockUsers.findIndex(u => u.user_id === userId);
-            if (userIndex > -1) {
-                mockUsers[userIndex].role = newRole;
-                resolve(JSON.parse(JSON.stringify(mockUsers[userIndex])));
-            } else {
-                reject(new Error("User not found"));
-            }
-        }, 300);
-    });
-};
-
-export const getFeeSchedule = (): Promise<{ monthlyDue: number, penalty: number }> => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            const storedFees = localStorage.getItem(FEE_SCHEDULE_KEY);
-            if (storedFees) {
-                resolve(JSON.parse(storedFees));
-            } else {
-                // Default values if not set
-                resolve({ monthlyDue: 2500, penalty: 250 });
-            }
-        }, 200);
-    });
-};
-
-export const updateFeeSchedule = (newSchedule: { monthlyDue: number, penalty: number }): Promise<{ monthlyDue: number, penalty: number }> => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            localStorage.setItem(FEE_SCHEDULE_KEY, JSON.stringify(newSchedule));
-            resolve(newSchedule);
-        }, 300);
-    });
+export const updateMockAppSettings = (settings: Partial<typeof mockSettings>): Promise<typeof mockSettings> => {
+    Object.assign(mockSettings, settings);
+    return Promise.resolve(mockSettings);
 };

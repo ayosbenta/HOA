@@ -1,7 +1,6 @@
-
 import React from 'react';
 import Card from '../components/ui/Card';
-import { DollarSign, FileText, Bell, Users, BarChart2 } from 'lucide-react';
+import { DollarSign, FileText, Bell, Users } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
     const summaryData = [

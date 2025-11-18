@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
-import { getVisitorsForHomeowner, getAllVisitors } from '../services/mockApi';
+import { getVisitorsForHomeowner, getAllVisitors } from '../services/googleSheetsApi';
 import { Visitor, User, UserRole } from '../types';
 import { QrCode, ShieldCheck, UserPlus } from 'lucide-react';
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
-import { getFeeSchedule, updateFeeSchedule } from '../services/mockApi';
+import { getAppSettings, updateAppSettings } from '../services/googleSheetsApi';
 import { DollarSign, CheckCircle } from 'lucide-react';
 
 const FeeSchedulePage: React.FC = () => {
@@ -14,7 +14,7 @@ const FeeSchedulePage: React.FC = () => {
         const fetchFees = async () => {
             setLoading(true);
             try {
-                const schedule = await getFeeSchedule();
+                const schedule = await getAppSettings();
                 setMonthlyDue(schedule.monthlyDue);
                 setPenalty(schedule.penalty);
             } catch (error) {
@@ -29,12 +29,12 @@ const FeeSchedulePage: React.FC = () => {
     const handleSaveChanges = async () => {
         setSaving(true);
         try {
-            await updateFeeSchedule({ monthlyDue, penalty });
+            await updateAppSettings({ monthlyDue, penalty });
             setShowSuccess(true);
             setTimeout(() => setShowSuccess(false), 2000);
         } catch (error) {
             console.error("Failed to update fee schedule", error);
-            // Show error toast
+            alert("Error: Could not save fee schedule.");
         } finally {
             setSaving(false);
         }

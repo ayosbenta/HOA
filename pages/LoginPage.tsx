@@ -11,45 +11,50 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const performLogin = async (emailToLogin: string, passwordToLogin: string) => {
     setError('');
     setLoading(true);
     try {
-      const user = await login(email, password);
-      if (!user) {
-        setError('Invalid email or password. Please try again.');
-      }
+        const user = await login(emailToLogin, passwordToLogin);
+        if (!user) {
+            // This case handles correct API response but invalid credentials
+            setError('Invalid username or password. Please try again.');
+        }
+        // Successful login is handled by the AuthContext, which will re-render the app
     } catch (err) {
-      setError('An unexpected error occurred. Please try again later.');
+        // This case handles API errors (e.g., network, server error)
+        if (err instanceof Error) {
+            if (err.message.includes("Failed to fetch")) {
+                setError("Login failed: Could not connect to the server. Please check your internet connection and ensure the backend script is deployed correctly.");
+            } else {
+                setError(`Login failed:\n${err.message}`);
+            }
+        } else {
+            setError('An unexpected error occurred. Please try again later.');
+        }
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performLogin(email, password);
+  };
+
   const handleQuickLogin = async (role: UserRole) => {
-    let credentials = { email: '', password: 'password' };
+    let credentials = { email: '', password: '' };
     if (role === UserRole.ADMIN) {
-      credentials.email = 'admin@hoa.com';
+      credentials.email = 'admin@gmail.com';
+      credentials.password = 'admin';
     } else if (role === UserRole.HOMEOWNER) {
       credentials.email = 'john.doe@home.com';
+      credentials.password = 'password';
     } else if (role === UserRole.STAFF) {
         credentials.email = 'staff@hoa.com';
+        credentials.password = 'password';
     }
-
-    // Directly call login without setting state first, to trigger form submission
-    setError('');
-    setLoading(true);
-    try {
-      const user = await login(credentials.email, credentials.password);
-      if (!user) {
-        setError(`Could not log in as ${role}. Please check mock credentials.`);
-      }
-    } catch (err) {
-      setError('An unexpected error occurred during quick login.');
-    } finally {
-      setLoading(false);
-    }
+    await performLogin(credentials.email, credentials.password);
   };
 
   return (
@@ -98,7 +103,7 @@ const LoginPage: React.FC = () => {
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+          {error && <p className="text-sm text-red-600 text-center whitespace-pre-wrap">{error}</p>}
 
           <div className="flex items-center justify-between">
             <div className="text-sm">

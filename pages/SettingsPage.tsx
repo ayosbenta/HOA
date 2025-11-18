@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Card from '../components/ui/Card';
-import { Upload, Trash2, Banknote, Users, Bell, DollarSign, Edit, CheckCircle } from 'lucide-react';
-
-const QR_CODE_STORAGE_KEY = 'hoa-gcash-qrcode';
+import { getAppSettings, updateAppSettings } from '../services/googleSheetsApi';
+import { Upload, Trash2, Banknote, Users, DollarSign, CheckCircle } from 'lucide-react';
 
 interface SettingsPageProps {
     onNavigate: (page: string) => void;
@@ -13,14 +12,25 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
     const [previewQrCode, setPreviewQrCode] = useState<string | null>(null);
     const [isDirty, setIsDirty] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [loading, setLoading] = useState(true);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        const storedQrCode = localStorage.getItem(QR_CODE_STORAGE_KEY);
-        if (storedQrCode) {
-            setSavedQrCode(storedQrCode);
-            setPreviewQrCode(storedQrCode);
-        }
+        const fetchSettings = async () => {
+            try {
+                setLoading(true);
+                const settings = await getAppSettings();
+                if (settings.gcashQrCode) {
+                    setSavedQrCode(settings.gcashQrCode);
+                    setPreviewQrCode(settings.gcashQrCode);
+                }
+            } catch (error) {
+                console.error("Failed to load settings", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchSettings();
     }, []);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,17 +58,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
         }
     }
 
-    const handleSaveChanges = () => {
-        if (previewQrCode) {
-            localStorage.setItem(QR_CODE_STORAGE_KEY, previewQrCode);
-            setSavedQrCode(previewQrCode);
-        } else {
-            localStorage.removeItem(QR_CODE_STORAGE_KEY);
-            setSavedQrCode(null);
+    const handleSaveChanges = async () => {
+        try {
+            const newQrCode = previewQrCode || '';
+            await updateAppSettings({ gcashQrCode: newQrCode });
+            setSavedQrCode(newQrCode);
+            setIsDirty(false);
+            setShowSuccess(true);
+            setTimeout(() => setShowSuccess(false), 3000); // Hide after 3 seconds
+        } catch (error) {
+            console.error("Failed to save QR Code", error);
+            alert("Error: Could not save settings.");
         }
-        setIsDirty(false);
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 3000); // Hide after 3 seconds
     };
 
     return (
@@ -94,7 +105,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onNavigate }) => {
                         <h4 className="font-semibold text-gray-700 mb-2">G-Cash Payments</h4>
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
                             <div className="w-48 h-48 border-2 border-dashed rounded-lg flex items-center justify-center bg-gray-50">
-                                {previewQrCode ? (
+                                {loading ? (
+                                    <div className="w-8 h-8 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+                                ) : previewQrCode ? (
                                     <img src={previewQrCode} alt="G-Cash QR Code" className="w-full h-full object-contain rounded-lg" />
                                 ) : (
                                     <span className="text-gray-400 text-sm text-center">QR Code Preview</span>
