@@ -131,7 +131,25 @@ function doGet(e) {
         data = getCached(CACHE_KEYS.ALL_USERS, getAllUsers);
         break;
       case 'getAppSettings':
-        data = getCached(CACHE_KEYS.APP_SETTINGS, getAppSettings);
+        // Custom caching logic for settings to avoid caching large QR code images.
+        const cachedFeeSchedule = CACHE.get(CACHE_KEYS.APP_SETTINGS);
+        if (cachedFeeSchedule != null) {
+          Logger.log(`Cache HIT for key: ${CACHE_KEYS.APP_SETTINGS}`);
+          data = JSON.parse(cachedFeeSchedule);
+          // Manually fetch and add the non-cached QR code
+          const settingsSheet = getSheetOrThrow("Settings");
+          const allSettingsData = sheetToJSON(settingsSheet, ['key', 'value']);
+          const qrCodeSetting = allSettingsData.find(s => s.key === 'gcashQrCode');
+          data.gcashQrCode = qrCodeSetting ? qrCodeSetting.value : null;
+        } else {
+          Logger.log(`Cache MISS for key: ${CACHE_KEYS.APP_SETTINGS}. Fetching data.`);
+          const allSettings = getAppSettings(); // This fetches everything from the sheet.
+          data = allSettings; // The full data to be returned to the client.
+          
+          // Now, create a version for the cache that excludes the large QR code.
+          const { gcashQrCode, ...settingsToCache } = allSettings;
+          CACHE.put(CACHE_KEYS.APP_SETTINGS, JSON.stringify(settingsToCache), CACHE_EXPIRATION_SECONDS);
+        }
         break;
       case 'getAmenityReservationsForUser':
         data = getCached(CACHE_KEYS.USER_RESERVATIONS(e.parameter.userId), () => getAmenityReservationsForUser(e.parameter.userId));
