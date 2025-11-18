@@ -12,8 +12,9 @@ import VisitorsPage from './pages/VisitorsPage';
 import SettingsPage from './pages/SettingsPage';
 import ManageRolesPage from './pages/ManageRolesPage';
 import FeeSchedulePage from './pages/FeeSchedulePage';
+import AmenitiesPage from './pages/AmenitiesPage';
 import { UserRole } from './types';
-import { House, CreditCard, Users, ShieldCheck, Settings, Bell } from 'lucide-react';
+import { House, CreditCard, Users, ShieldCheck, Settings, Bell, CalendarCheck } from 'lucide-react';
 import RegistrationPage from './pages/RegistrationPage';
 
 const App: React.FC = () => {
@@ -49,6 +50,7 @@ const App: React.FC = () => {
         { name: 'Billing', icon: CreditCard },
         { name: 'Manage Roles', icon: Users },
         { name: 'Visitors Log', icon: ShieldCheck },
+        { name: 'Amenities', icon: CalendarCheck },
         { name: 'Settings', icon: Settings },
       ];
     }
@@ -58,6 +60,7 @@ const App: React.FC = () => {
         ...commonItems,
         { name: 'My Billing', icon: CreditCard },
         { name: 'Visitors Pass', icon: ShieldCheck },
+        { name: 'Amenities', icon: CalendarCheck },
       ];
     }
     
@@ -84,6 +87,8 @@ const App: React.FC = () => {
       case 'Visitors Pass':
       case 'Visitors Log':
         return <VisitorsPage user={user} />;
+      case 'Amenities':
+        return <AmenitiesPage user={user} />;
       case 'Settings':
         return <SettingsPage onNavigate={setCurrentPage} />;
       case 'Manage Roles':

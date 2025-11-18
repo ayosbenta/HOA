@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
-import { getVisitorsForHomeowner, getAllVisitors } from '../services/googleSheetsApi';
+import { getVisitorsForHomeowner, getAllVisitors, createVisitorPass } from '../services/googleSheetsApi';
 import { Visitor, User, UserRole } from '../types';
 import { QrCode, ShieldCheck, UserPlus } from 'lucide-react';
 
@@ -11,6 +11,11 @@ interface VisitorsPageProps {
 const VisitorsPage: React.FC<VisitorsPageProps> = ({ user }) => {
     const [visitors, setVisitors] = useState<Visitor[]>([]);
     const [loading, setLoading] = useState(true);
+    const [guestName, setGuestName] = useState('');
+    const [plateNumber, setPlateNumber] = useState('');
+    const [visitDate, setVisitDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formError, setFormError] = useState('');
 
     useEffect(() => {
         const fetchVisitors = async () => {
@@ -29,6 +34,37 @@ const VisitorsPage: React.FC<VisitorsPageProps> = ({ user }) => {
         fetchVisitors();
     }, [user]);
 
+    const handleCreatePass = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!guestName.trim()) {
+            setFormError('Guest name is required.');
+            return;
+        }
+        setFormError('');
+        setIsSubmitting(true);
+        try {
+            const newVisitor = await createVisitorPass({
+                homeownerId: user.user_id,
+                name: guestName,
+                vehicle: plateNumber,
+                date: visitDate,
+            });
+            setVisitors(prev => [newVisitor, ...prev]);
+            setGuestName('');
+            setPlateNumber('');
+            setVisitDate(new Date().toISOString().split('T')[0]);
+        } catch (error) {
+            console.error("Failed to create visitor pass", error);
+            if (error instanceof Error) {
+                setFormError(error.message);
+            } else {
+                setFormError("An unknown error occurred.");
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const isHomeowner = user.role === UserRole.HOMEOWNER;
 
     return (
@@ -39,21 +75,47 @@ const VisitorsPage: React.FC<VisitorsPageProps> = ({ user }) => {
                         <UserPlus className="mr-2 text-brand-secondary" />
                         Create Visitor Pass
                     </h3>
-                    <form className="space-y-4">
+                    <form className="space-y-4" onSubmit={handleCreatePass}>
                         <div>
                             <label htmlFor="guestName" className="block text-sm font-medium text-gray-700">Guest Name</label>
-                            <input type="text" id="guestName" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary" />
+                            <input 
+                                type="text" 
+                                id="guestName" 
+                                value={guestName}
+                                onChange={(e) => setGuestName(e.target.value)}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary" 
+                                required 
+                            />
                         </div>
                         <div>
                             <label htmlFor="plateNumber" className="block text-sm font-medium text-gray-700">Vehicle Plate No. (optional)</label>
-                            <input type="text" id="plateNumber" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary" />
+                            <input 
+                                type="text" 
+                                id="plateNumber" 
+                                value={plateNumber}
+                                onChange={(e) => setPlateNumber(e.target.value)}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary" 
+                            />
                         </div>
                         <div>
                             <label htmlFor="visitDate" className="block text-sm font-medium text-gray-700">Date of Visit</label>
-                            <input type="date" id="visitDate" defaultValue={new Date().toISOString().split('T')[0]} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary" />
+                            <input 
+                                type="date" 
+                                id="visitDate" 
+                                value={visitDate}
+                                onChange={(e) => setVisitDate(e.target.value)}
+                                min={new Date().toISOString().split('T')[0]}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary" 
+                                required
+                            />
                         </div>
-                        <button type="submit" className="w-full py-2 px-4 bg-brand-primary text-white font-semibold rounded-lg hover:bg-brand-dark transition-colors">
-                            Generate Pass
+                        {formError && <p className="text-sm text-red-600">{formError}</p>}
+                        <button type="submit" disabled={isSubmitting} className="w-full py-2 px-4 bg-brand-primary text-white font-semibold rounded-lg hover:bg-brand-dark transition-colors disabled:bg-gray-400 flex justify-center items-center">
+                             {isSubmitting ? (
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                'Generate Pass'
+                            )}
                         </button>
                     </form>
                 </Card>

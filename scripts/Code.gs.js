@@ -27,6 +27,9 @@
 //
 // Sheet: Settings
 // Columns: key, value
+//
+// Sheet: Amenity Reservations
+// Columns: reservation_id, user_id, amenity_name, reservation_date, start_time, end_time, status, notes
 // =================================================================
 
 const SS = SpreadsheetApp.getActiveSpreadsheet();
@@ -83,6 +86,12 @@ function doGet(e) {
       case 'getAppSettings':
         data = getAppSettings();
         break;
+      case 'getAmenityReservationsForUser':
+        data = getAmenityReservationsForUser(e.parameter.userId);
+        break;
+      case 'getAllAmenityReservations':
+        data = getAllAmenityReservations();
+        break;
       default:
         return jsonResponse({ error: 'Invalid GET action: ' + action }, false);
     }
@@ -119,11 +128,20 @@ function doPost(e) {
       case 'register':
         data = register(payload);
         break;
-      case 'updateUserRole':
-        data = updateUserRole(payload.userId, payload.newRole);
+      case 'updateUser':
+        data = updateUser(payload);
         break;
       case 'updateAppSettings':
         data = updateAppSettings(payload.settings);
+        break;
+      case 'createVisitorPass':
+        data = createVisitorPass(payload);
+        break;
+      case 'createAmenityReservation':
+        data = createAmenityReservation(payload);
+        break;
+      case 'updateAmenityReservationStatus':
+        data = updateAmenityReservationStatus(payload);
         break;
       default:
         return jsonResponse({ error: 'Invalid POST action: ' + action }, false);
@@ -260,7 +278,11 @@ function getAllUsers() {
     });
 }
 
-function updateUserRole(userId, newRole) {
+function updateUser(payload) {
+    const { userId, newRole, newStatus } = payload;
+    if (!userId || !newRole || !newStatus) {
+        throw new Error("User ID, new role, and new status are required for an update.");
+    }
     const usersSheet = getSheetOrThrow("Users");
     const users = usersSheet.getDataRange().getValues();
     const headers = users[0];
@@ -268,7 +290,11 @@ function updateUserRole(userId, newRole) {
 
     if (userIndex !== -1) {
         const roleIndex = headers.indexOf('role');
+        const statusIndex = headers.indexOf('status');
+        
         usersSheet.getRange(userIndex + 1, roleIndex + 1).setValue(newRole);
+        usersSheet.getRange(userIndex + 1, statusIndex + 1).setValue(newStatus);
+
         // Return the updated user
         const updatedUserRow = usersSheet.getRange(userIndex + 1, 1, 1, headers.length).getValues()[0];
         const userObject = headers.reduce((obj, header, i) => {
@@ -279,6 +305,38 @@ function updateUserRole(userId, newRole) {
         return userClientData;
     }
     throw new Error('User not found');
+}
+
+function createVisitorPass(payload) {
+    const { homeownerId, name, vehicle, date } = payload;
+    if (!homeownerId || !name || !date) {
+        throw new Error("Homeowner ID, guest name, and date are required to create a pass.");
+    }
+
+    const visitorsSheet = getSheetOrThrow("Visitors");
+    const headers = visitorsSheet.getRange(1, 1, 1, visitorsSheet.getLastColumn()).getValues()[0];
+    
+    const newVisitorId = 'vis_' + new Date().getTime();
+    const qrCode = 'qr_' + newVisitorId; // Placeholder QR code data
+    const status = 'expected';
+    
+    const newVisitor = {
+      visitor_id: newVisitorId,
+      homeowner_id: homeownerId,
+      name: name,
+      vehicle: vehicle || '',
+      date: date,
+      time_in: null,
+      time_out: null,
+      qr_code: qrCode,
+      status: status
+    };
+
+    const newRow = headers.map(header => newVisitor[String(header).trim()] !== undefined ? newVisitor[String(header).trim()] : null);
+
+    visitorsSheet.appendRow(newRow);
+    
+    return newVisitor;
 }
 
 function getAppSettings() {
@@ -317,6 +375,84 @@ function updateAppSettings(newSettings) {
         }
     });
     return getAppSettings();
+}
+
+// --- AMENITY RESERVATION FUNCTIONS ---
+
+function createAmenityReservation(payload) {
+    const { userId, amenityName, reservationDate, startTime, endTime, notes } = payload;
+    if (!userId || !amenityName || !reservationDate || !startTime || !endTime) {
+        throw new Error("User, amenity, date, and times are required.");
+    }
+
+    const reservationsSheet = getSheetOrThrow("Amenity Reservations");
+    const headers = reservationsSheet.getRange(1, 1, 1, reservationsSheet.getLastColumn()).getValues()[0];
+
+    const newReservationId = 'res_' + new Date().getTime();
+    const newReservation = {
+        reservation_id: newReservationId,
+        user_id: userId,
+        amenity_name: amenityName,
+        reservation_date: reservationDate,
+        start_time: startTime,
+        end_time: endTime,
+        status: 'pending',
+        notes: notes || '',
+    };
+    
+    const newRow = headers.map(header => newReservation[String(header).trim()] !== undefined ? newReservation[String(header).trim()] : null);
+    reservationsSheet.appendRow(newRow);
+    
+    return newReservation;
+}
+
+function getAmenityReservationsForUser(userId) {
+    const sheet = getSheetOrThrow("Amenity Reservations");
+    const reservations = sheetToJSON(sheet, ['reservation_id', 'user_id']);
+    return reservations.filter(r => r.user_id === userId).sort((a,b) => new Date(b.reservation_date) - new Date(a.reservation_date));
+}
+
+function getAllAmenityReservations() {
+    const reservationsSheet = getSheetOrThrow("Amenity Reservations");
+    const reservations = sheetToJSON(reservationsSheet, ['reservation_id']);
+    const usersSheet = getSheetOrThrow("Users");
+    const users = sheetToJSON(usersSheet, ['user_id']);
+
+    // Join with user data to get full_name
+    const reservationsWithNames = reservations.map(res => {
+        const user = users.find(u => u.user_id === res.user_id);
+        return {
+            ...res,
+            full_name: user ? user.full_name : 'Unknown User',
+        };
+    });
+    
+    return reservationsWithNames.sort((a,b) => new Date(b.reservation_date) - new Date(a.reservation_date));
+}
+
+function updateAmenityReservationStatus(payload) {
+    const { reservationId, status } = payload;
+    if (!reservationId || !status) {
+        throw new Error("Reservation ID and new status are required.");
+    }
+
+    const sheet = getSheetOrThrow("Amenity Reservations");
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const idIndex = headers.indexOf('reservation_id');
+    const statusIndex = headers.indexOf('status');
+
+    const rowIndex = data.findIndex(row => row[idIndex] === reservationId);
+
+    if (rowIndex !== -1) {
+        sheet.getRange(rowIndex + 1, statusIndex + 1).setValue(status);
+        const updatedRow = sheet.getRange(rowIndex + 1, 1, 1, headers.length).getValues()[0];
+        return headers.reduce((obj, header, i) => {
+            obj[header] = updatedRow[i];
+            return obj;
+        }, {});
+    }
+    throw new Error('Reservation not found');
 }
 
 // --- UTILITY FUNCTIONS ---
@@ -368,6 +504,7 @@ function setupMockData() {
   const duesSheet = getOrCreateSheet("Dues");
   const visitorsSheet = getOrCreateSheet("Visitors");
   const settingsSheet = getOrCreateSheet("Settings");
+  const amenityReservationsSheet = getOrCreateSheet("Amenity Reservations");
   
   const today = new Date().toISOString();
 
@@ -436,6 +573,20 @@ function setupMockData() {
     settingsSheet.getRange(2, 1, settingsData.length, settingsData[0].length).setValues(settingsData);
   }
   settingsSheet.setFrozenRows(1);
+
+  // === Set up Amenity Reservations sheet ===
+  const amenityReservationsHeaders = ['reservation_id', 'user_id', 'amenity_name', 'reservation_date', 'start_time', 'end_time', 'status', 'notes'];
+  const amenityReservationsData = [
+    ['res_001', 'user_002', 'Clubhouse', '2023-11-25', '18:00', '22:00', 'approved', 'Birthday Party for 20 guests.'],
+    ['res_002', 'user_003', 'Basketball Court', '2023-11-20', '09:00', '11:00', 'pending', ''],
+    ['res_003', 'user_002', 'Swimming Pool', '2023-11-18', '14:00', '16:00', 'denied', 'Scheduled maintenance.']
+  ];
+  amenityReservationsSheet.getRange(1, 1, 1, amenityReservationsHeaders.length).setValues([amenityReservationsHeaders]).setFontWeight('bold');
+  if (amenityReservationsData.length > 0) {
+    amenityReservationsSheet.getRange(2, 1, amenityReservationsData.length, amenityReservationsData[0].length).setValues(amenityReservationsData);
+  }
+  amenityReservationsSheet.setFrozenRows(1);
+
 
   SpreadsheetApp.flush();
   Logger.log('Mock data and headers have been set up successfully!');

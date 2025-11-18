@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = 'Admin',
   HOMEOWNER = 'Homeowner',
@@ -60,4 +59,16 @@ export interface Visitor {
   time_out: string | null;
   qr_code: string;
   status: 'expected' | 'entered' | 'exited' | 'denied';
+}
+
+export interface AmenityReservation {
+  reservation_id: string;
+  user_id: string;
+  full_name?: string; // Added for admin view
+  amenity_name: 'Clubhouse' | 'Basketball Court' | 'Swimming Pool';
+  reservation_date: string;
+  start_time: string;
+  end_time: string;
+  status: 'pending' | 'approved' | 'denied' | 'completed';
+  notes?: string;
 }

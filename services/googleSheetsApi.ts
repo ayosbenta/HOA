@@ -1,4 +1,4 @@
-import { User, UserRole, Announcement, Due, Visitor } from '../types';
+import { User, UserRole, Announcement, Due, Visitor, AmenityReservation } from '../types';
 
 // IMPORTANT: Replace this with your own Google Apps Script Web App URL
 // 1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/1VVSb9V6vLcG97GV6uu7Z0-ok0tfoJh13-V5OLOgzw3I/edit
@@ -22,6 +22,22 @@ export interface RegistrationPayload {
     block: string;
     lot: string;
     password: string;
+}
+
+export interface VisitorPayload {
+    homeownerId: string;
+    name: string;
+    vehicle: string;
+    date: string;
+}
+
+export interface AmenityReservationPayload {
+    userId: string;
+    amenityName: AmenityReservation['amenity_name'];
+    reservationDate: string;
+    startTime: string;
+    endTime: string;
+    notes: string;
 }
 
 
@@ -97,11 +113,11 @@ export const getAllUsers = (): Promise<User[]> => {
     return fetch(`${SCRIPT_URL}?action=getAllUsers`).then(handleApiResponse);
 };
 
-export const updateUserRole = (userId: string, newRole: UserRole): Promise<User> => {
+export const updateUser = (userId: string, newRole: UserRole, newStatus: User['status']): Promise<User> => {
      const response = fetch(SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'updateUserRole', payload: { userId, newRole } }),
+        body: JSON.stringify({ action: 'updateUser', payload: { userId, newRole, newStatus } }),
     });
     return response.then(handleApiResponse);
 };
@@ -115,6 +131,43 @@ export const updateAppSettings = (settings: Partial<AppSettings>): Promise<AppSe
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'updateAppSettings', payload: { settings } }),
+    });
+    return response.then(handleApiResponse);
+};
+
+export const createVisitorPass = (payload: VisitorPayload): Promise<Visitor> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'createVisitorPass', payload }),
+    });
+    return response.then(handleApiResponse);
+};
+
+// --- Amenity Reservations API ---
+
+export const getAmenityReservationsForUser = (userId: string): Promise<AmenityReservation[]> => {
+    return fetch(`${SCRIPT_URL}?action=getAmenityReservationsForUser&userId=${userId}`).then(handleApiResponse);
+};
+
+export const getAllAmenityReservations = (): Promise<AmenityReservation[]> => {
+    return fetch(`${SCRIPT_URL}?action=getAllAmenityReservations`).then(handleApiResponse);
+};
+
+export const createAmenityReservation = (payload: AmenityReservationPayload): Promise<AmenityReservation> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'createAmenityReservation', payload }),
+    });
+    return response.then(handleApiResponse);
+};
+
+export const updateAmenityReservationStatus = (reservationId: string, status: AmenityReservation['status']): Promise<AmenityReservation> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'updateAmenityReservationStatus', payload: { reservationId, status } }),
     });
     return response.then(handleApiResponse);
 };
