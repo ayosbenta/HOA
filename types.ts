@@ -52,6 +52,8 @@ export interface Payment {
 export interface Visitor {
   visitor_id: string;
   homeowner_id: string; // user_id
+  homeowner_name?: string;
+  homeowner_address?: string;
   name: string;
   vehicle: string;
   date: string;
@@ -71,4 +73,17 @@ export interface AmenityReservation {
   end_time: string;
   status: 'pending' | 'approved' | 'denied' | 'completed';
   notes?: string;
+}
+
+export interface AdminDashboardData {
+    duesCollected: number;
+    pendingApprovalsCount: number;
+    upcomingEventsCount: number;
+    activeMembers: number;
+    pendingApprovals: {
+        id: string;
+        name: string;
+        type: string;
+        date: string;
+    }[];
 }

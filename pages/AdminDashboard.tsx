@@ -1,26 +1,45 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
-import { DollarSign, FileText, Bell, Users } from 'lucide-react';
+import { getAdminDashboardData } from '../services/googleSheetsApi';
+import { AdminDashboardData } from '../types';
+import { DollarSign, UserCheck, Bell, Users } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
+    const [data, setData] = useState<AdminDashboardData | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const dashboardData = await getAdminDashboardData();
+                setData(dashboardData);
+            } catch (error) {
+                console.error("Failed to fetch admin dashboard data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
+    if (!data) {
+        return <div className="text-center p-8">Could not load dashboard data.</div>;
+    }
+
     const summaryData = [
-        { title: 'Dues Collected (This Month)', value: '₱125,300', icon: DollarSign, color: 'text-green-500', bgColor: 'bg-green-100' },
-        { title: 'Pending Complaints', value: '8', icon: FileText, color: 'text-yellow-500', bgColor: 'bg-yellow-100' },
-        { title: 'Upcoming Events', value: '2', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-100' },
-        { title: 'Active Members', value: '256', icon: Users, color: 'text-indigo-500', bgColor: 'bg-indigo-100' },
-    ];
-
-    const pendingApprovals = [
-        { name: 'Juan Dela Cruz', type: 'New Member', date: '2023-10-27' },
-        { name: 'Maria Clara', type: 'Facility Reservation', date: '2023-10-26' },
-        { name: 'Jose Rizal', type: 'New Member', date: '2023-10-25' },
-    ];
-
-    const recentActivity = [
-        { activity: 'New announcement posted: "Octoberfest Party"', time: '2 hours ago' },
-        { activity: 'Payment received from B5 L12', time: '5 hours ago' },
-        { activity: 'Complaint #1024 resolved', time: '1 day ago' },
-        { activity: 'New visitor pass created for B8 L2', time: '1 day ago' },
+        { title: 'Dues Collected (This Month)', value: `₱${data.duesCollected.toLocaleString()}`, icon: DollarSign, color: 'text-green-500', bgColor: 'bg-green-100' },
+        { title: 'Pending Approvals', value: data.pendingApprovalsCount, icon: UserCheck, color: 'text-yellow-500', bgColor: 'bg-yellow-100' },
+        { title: 'Upcoming Events', value: data.upcomingEventsCount, icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-100' },
+        { title: 'Active Homeowners', value: data.activeMembers, icon: Users, color: 'text-indigo-500', bgColor: 'bg-indigo-100' },
     ];
 
     return (
@@ -55,16 +74,20 @@ const AdminDashboard: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {pendingApprovals.map((item, index) => (
-                                    <tr key={index} className="bg-white border-b">
+                                {data.pendingApprovals.length > 0 ? data.pendingApprovals.map((item) => (
+                                    <tr key={item.id} className="bg-white border-b">
                                         <td className="px-6 py-4 font-medium text-gray-900">{item.name}</td>
                                         <td className="px-6 py-4">{item.type}</td>
-                                        <td className="px-6 py-4">{item.date}</td>
+                                        <td className="px-6 py-4">{new Date(item.date).toLocaleDateString()}</td>
                                         <td className="px-6 py-4">
                                             <button className="font-medium text-brand-primary hover:underline">View</button>
                                         </td>
                                     </tr>
-                                ))}
+                                )) : (
+                                    <tr>
+                                        <td colSpan={4} className="text-center py-8 text-gray-500">No pending approvals.</td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -78,21 +101,6 @@ const AdminDashboard: React.FC = () => {
                     </div>
                 </Card>
             </div>
-            
-             <Card className="p-5">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Activity</h3>
-                <ul className="space-y-4">
-                    {recentActivity.map((item, index) => (
-                        <li key={index} className="flex items-start">
-                           <div className="flex-shrink-0 w-3 h-3 bg-brand-secondary rounded-full mt-1.5 mr-3"></div>
-                           <div>
-                               <p className="text-gray-700">{item.activity}</p>
-                               <p className="text-xs text-gray-400">{item.time}</p>
-                           </div>
-                        </li>
-                    ))}
-                </ul>
-            </Card>
         </div>
     );
 };

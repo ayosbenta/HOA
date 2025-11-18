@@ -134,7 +134,7 @@ const VisitorsPage: React.FC<VisitorsPageProps> = ({ user }) => {
                             <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                                 <tr>
                                     <th scope="col" className="px-6 py-3">Visitor Name</th>
-                                    {!isHomeowner && <th scope="col" className="px-6 py-3">Homeowner</th>}
+                                    {!isHomeowner && <th scope="col" className="px-6 py-3">Homeowner (Unit)</th>}
                                     <th scope="col" className="px-6 py-3">Vehicle</th>
                                     <th scope="col" className="px-6 py-3">Date</th>
                                     <th scope="col" className="px-6 py-3">Status</th>
@@ -148,7 +148,7 @@ const VisitorsPage: React.FC<VisitorsPageProps> = ({ user }) => {
                                     visitors.map((visitor) => (
                                         <tr key={visitor.visitor_id} className="bg-white border-b hover:bg-gray-50">
                                             <td className="px-6 py-4 font-medium text-gray-900">{visitor.name}</td>
-                                            {!isHomeowner && <td className="px-6 py-4">B{Math.floor(Math.random()*10)} L{Math.floor(Math.random()*20)}</td>}
+                                            {!isHomeowner && <td className="px-6 py-4">{visitor.homeowner_name} ({visitor.homeowner_address})</td>}
                                             <td className="px-6 py-4">{visitor.vehicle || 'N/A'}</td>
                                             <td className="px-6 py-4">{visitor.date}</td>
                                             <td className="px-6 py-4 capitalize">{visitor.status}</td>

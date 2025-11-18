@@ -1,4 +1,4 @@
-import { User, UserRole, Announcement, Due, Visitor, AmenityReservation } from '../types';
+import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData } from '../types';
 
 // IMPORTANT: Replace this with your own Google Apps Script Web App URL
 // 1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/1VVSb9V6vLcG97GV6uu7Z0-ok0tfoJh13-V5OLOgzw3I/edit
@@ -104,8 +104,12 @@ export const getAllVisitors = (): Promise<Visitor[]> => {
     return fetch(`${SCRIPT_URL}?action=getAllVisitors`).then(handleApiResponse);
 };
 
-export const getHomeownerDashboardData = (userId: string): Promise<{ dues: Due[], announcements: Announcement[] }> => {
+export const getHomeownerDashboardData = (userId: string): Promise<{ dues: Due[], announcements: Announcement[], pendingRequestsCount: number }> => {
     return fetch(`${SCRIPT_URL}?action=getHomeownerDashboardData&userId=${userId}`).then(handleApiResponse);
+};
+
+export const getAdminDashboardData = (): Promise<AdminDashboardData> => {
+    return fetch(`${SCRIPT_URL}?action=getAdminDashboardData`).then(handleApiResponse);
 };
 
 

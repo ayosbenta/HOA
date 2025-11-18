@@ -80,6 +80,9 @@ function doGet(e) {
       case 'getHomeownerDashboardData':
         data = getHomeownerDashboardData(e.parameter.userId);
         break;
+      case 'getAdminDashboardData':
+        data = getAdminDashboardData();
+        break;
       case 'getAllUsers':
         data = getAllUsers();
         break;
@@ -259,14 +262,90 @@ function getVisitorsForHomeowner(homeownerId) {
 
 function getAllVisitors() {
     const visitorsSheet = getSheetOrThrow("Visitors");
-    return sheetToJSON(visitorsSheet, ['visitor_id']);
+    const visitors = sheetToJSON(visitorsSheet, ['visitor_id']);
+    const usersSheet = getSheetOrThrow("Users");
+    const users = sheetToJSON(usersSheet, ['user_id', 'block', 'lot', 'full_name']);
+
+    const visitorsWithHomeowner = visitors.map(v => {
+      const homeowner = users.find(u => u.user_id === v.homeowner_id);
+      return {
+        ...v,
+        homeowner_name: homeowner ? homeowner.full_name : 'N/A',
+        homeowner_address: homeowner ? `B${homeowner.block} L${homeowner.lot}` : 'N/A'
+      };
+    });
+    return visitorsWithHomeowner.sort((a,b) => new Date(b.date) - new Date(a.date));
 }
 
 function getHomeownerDashboardData(userId) {
     const dues = getDuesForUser(userId);
     const announcements = getAnnouncements().slice(0, 3); // Get latest 3
-    return { dues, announcements };
+
+    const amenityReservations = getAmenityReservationsForUser(userId);
+    const pendingAmenityReservations = amenityReservations.filter(r => r.status === 'pending').length;
+    
+    // Assuming there could be other types of requests in the future
+    const totalPendingRequests = pendingAmenityReservations;
+
+    return { dues, announcements, pendingRequestsCount: totalPendingRequests };
 }
+
+function getAdminDashboardData() {
+  const usersSheet = getSheetOrThrow("Users");
+  const duesSheet = getSheetOrThrow("Dues");
+  const amenityReservationsSheet = getSheetOrThrow("Amenity Reservations");
+
+  const users = sheetToJSON(usersSheet);
+  const dues = sheetToJSON(duesSheet);
+  const amenityReservations = sheetToJSON(amenityReservationsSheet);
+
+  // 1. Dues collected this month
+  const now = new Date();
+  const currentMonthStr = now.toLocaleString('default', { month: 'long' }) + ' ' + now.getFullYear();
+  const duesThisMonth = dues
+    .filter(d => d.billing_month === currentMonthStr && d.status === 'paid')
+    .reduce((sum, d) => sum + parseFloat(d.total_due || 0), 0);
+
+  // 2. Pending users
+  const pendingUsers = users.filter(u => u.status === 'pending');
+
+  // 3. Pending amenity reservations
+  const pendingReservations = amenityReservations.filter(r => r.status === 'pending');
+  
+  // 4. Active members
+  const activeMembers = users.filter(u => u.status === 'active' && u.role === 'Homeowner').length;
+  
+  // 5. Pending approvals list (combine and sort by date)
+  const userApprovals = pendingUsers.map(u => ({
+    id: u.user_id,
+    name: u.full_name,
+    type: 'New Member',
+    date: u.date_created
+  }));
+
+  const amenityApprovals = pendingReservations.map(r => {
+      const user = users.find(u => u.user_id === r.user_id);
+      return {
+        id: r.reservation_id,
+        name: user ? user.full_name : 'Unknown User',
+        type: `Amenity: ${r.amenity_name}`,
+        date: r.reservation_date
+      };
+  });
+
+  const allPendingApprovals = [...userApprovals, ...amenityApprovals]
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 5); // get latest 5
+
+  return {
+    duesCollected: duesThisMonth,
+    pendingApprovalsCount: pendingUsers.length + pendingReservations.length,
+    upcomingEventsCount: 0, // Placeholder, no events feature yet
+    activeMembers: activeMembers,
+    pendingApprovals: allPendingApprovals
+  };
+}
+
 
 function getAllUsers() {
     const usersSheet = getSheetOrThrow("Users");

@@ -9,6 +9,7 @@ const HomeownerDashboard: React.FC = () => {
     const { user } = useAuth();
     const [dues, setDues] = useState<Due[]>([]);
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+    const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -19,6 +20,7 @@ const HomeownerDashboard: React.FC = () => {
                     const data = await getHomeownerDashboardData(user.user_id);
                     setDues(data.dues);
                     setAnnouncements(data.announcements);
+                    setPendingRequestsCount(data.pendingRequestsCount);
                 } catch (error) {
                     console.error("Failed to fetch dashboard data", error);
                 } finally {
@@ -71,7 +73,7 @@ const HomeownerDashboard: React.FC = () => {
                 <Card className="p-6">
                      <h3 className="text-lg font-semibold text-gray-800 mb-4">My Requests</h3>
                      <div className="space-y-2 text-center">
-                        <p className="text-4xl font-bold text-brand-primary">3</p>
+                        <p className="text-4xl font-bold text-brand-primary">{pendingRequestsCount}</p>
                         <p className="text-gray-500">Pending Requests</p>
                         <button className="mt-2 w-full px-4 py-2 text-sm border border-brand-primary text-brand-primary font-semibold rounded-lg hover:bg-brand-light transition-colors">
                             View All Requests
