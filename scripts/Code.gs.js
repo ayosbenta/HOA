@@ -232,6 +232,13 @@ function doPost(e) {
         clearCache(CACHE_KEYS.ALL_DUES);
         clearCache(CACHE_KEYS.USER_DUES(payload.userId));
         break;
+      case 'recordCashPaymentIntent':
+        data = recordCashPaymentIntent(payload);
+        if (data && data.user_id) {
+          clearCache(CACHE_KEYS.ALL_DUES);
+          clearCache(CACHE_KEYS.USER_DUES(data.user_id));
+        }
+        break;
       case 'updatePaymentStatus':
         data = updatePaymentStatus(payload);
         clearCache(CACHE_KEYS.ALL_DUES);
@@ -730,6 +737,47 @@ function submitPayment(payload) {
     status: 'pending',
     date_paid: new Date().toISOString(),
     notes: ''
+  };
+
+  const newRow = headers.map(header => newPayment[String(header).trim()] !== undefined ? newPayment[String(header).trim()] : null);
+  paymentsSheet.appendRow(newRow);
+
+  return newPayment;
+}
+
+function recordCashPaymentIntent(payload) {
+  const { dueId } = payload;
+  if (!dueId) {
+    throw new Error("Due ID is required to record a cash payment intent.");
+  }
+
+  const duesSheet = getSheetOrThrow("Dues");
+  const allDues = sheetToJSON(duesSheet, ['due_id', 'user_id']);
+  const due = allDues.find(d => d.due_id === dueId);
+  if (!due) {
+    throw new Error("Due not found.");
+  }
+
+  const paymentsSheet = getSheetOrThrow("Payments");
+  const allPayments = sheetToJSON(paymentsSheet, ['due_id']);
+  const existingPayment = allPayments.find(p => p.due_id === dueId && (p.status === 'pending' || p.status === 'verified'));
+  if (existingPayment) {
+    throw new Error(`A payment for this due is already ${existingPayment.status}.`);
+  }
+
+  const headers = paymentsSheet.getRange(1, 1, 1, paymentsSheet.getLastColumn()).getValues()[0];
+  const newPaymentId = 'pay_' + new Date().getTime();
+  
+  const newPayment = {
+    payment_id: newPaymentId,
+    due_id: dueId,
+    user_id: due.user_id,
+    amount: due.total_due,
+    method: 'Cash',
+    proof_url: '',
+    status: 'pending',
+    date_paid: new Date().toISOString(),
+    notes: 'Pending cash payment at office.'
   };
 
   const newRow = headers.map(header => newPayment[String(header).trim()] !== undefined ? newPayment[String(header).trim()] : null);

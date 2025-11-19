@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../components/ui/Card';
 import PaymentModal from '../components/modals/PaymentModal';
 import ReceiptModal from '../components/modals/ReceiptModal';
-import { getDuesForUser, getAllDues } from '../services/googleSheetsApi';
+import PaymentMethodModal from '../components/modals/PaymentMethodModal';
+import { getDuesForUser, getAllDues, recordCashPaymentIntent } from '../services/googleSheetsApi';
 import { Due, User, UserRole } from '../types';
 import { CreditCard, AlertTriangle } from 'lucide-react';
 import Tooltip from '../components/ui/Tooltip';
@@ -16,10 +17,11 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [isMethodModalOpen, setIsMethodModalOpen] = useState(false);
   const [selectedDue, setSelectedDue] = useState<Due | null>(null);
+  const [isSubmittingCash, setIsSubmittingCash] = useState(false);
 
   const fetchDues = useCallback(async () => {
-    // Keep modals from closing during refetch, but still show loading state in table
     setLoading(true);
     try {
       const data = user.role === UserRole.ADMIN 
@@ -39,7 +41,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
 
   const handlePayNowClick = (due: Due) => {
     setSelectedDue(due);
-    setIsPaymentModalOpen(true);
+    setIsMethodModalOpen(true);
   };
 
   const handleViewReceiptClick = (due: Due) => {
@@ -59,9 +61,39 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
     fetchDues();
   };
 
+  const handleSelectGcash = () => {
+    setIsMethodModalOpen(false);
+    setIsPaymentModalOpen(true);
+  };
+
+  const handleSelectCash = async () => {
+     if (!selectedDue) return;
+
+    const confirmed = window.confirm(
+      'You have selected to pay in cash. Please proceed to the HOA admin office during office hours to complete your payment.\n\nYour payment will be marked as "Pending" until an admin verifies receipt of your payment.'
+    );
+
+    if (confirmed) {
+      setIsSubmittingCash(true);
+      try {
+        await recordCashPaymentIntent(selectedDue.due_id);
+        setIsMethodModalOpen(false);
+        setSelectedDue(null);
+        fetchDues();
+      } catch (error) {
+        console.error("Failed to record cash payment intent:", error);
+        alert(`Error: ${error instanceof Error ? error.message : 'Could not proceed with cash payment.'}`);
+      } finally {
+        setIsSubmittingCash(false);
+      }
+    }
+  };
+
+
   const getStatusChip = (due: Due) => {
     if (due.payment?.status === 'pending') {
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Pending Verification</span>;
+        const text = due.payment.method === 'Cash' ? 'Pending Cash Payment' : 'Pending Verification';
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{text}</span>;
     }
      if (due.payment?.status === 'rejected') {
         return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">Payment Rejected</span>;
@@ -89,7 +121,8 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
             return <button onClick={() => handleViewReceiptClick(due)} className="font-medium text-brand-primary hover:underline text-xs">View Receipt</button>;
         }
         if (payment?.status === 'pending') {
-            return <button disabled className="font-medium text-gray-400 cursor-not-allowed px-3 py-1 rounded-md text-xs">Payment Pending</button>;
+            const text = payment.method === 'Cash' ? 'Pending Cash Payment' : 'Payment Pending';
+            return <button disabled className="font-medium text-gray-400 cursor-not-allowed px-3 py-1 rounded-md text-xs">{text}</button>;
         }
         if (payment?.status === 'rejected') {
             return (
@@ -164,6 +197,16 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
           )}
         </div>
       </Card>
+
+      <PaymentMethodModal
+        isOpen={isMethodModalOpen}
+        onClose={() => setIsMethodModalOpen(false)}
+        due={selectedDue}
+        onSelectGcash={handleSelectGcash}
+        onSelectCash={handleSelectCash}
+        isSubmittingCash={isSubmittingCash}
+      />
+
       <PaymentModal 
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}

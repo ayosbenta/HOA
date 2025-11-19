@@ -80,10 +80,20 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, onUpdate, 
                     )}
 
                     <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">Payment Proof:</p>
-                        <div className="w-full h-auto max-h-96 overflow-auto border rounded-lg flex justify-center items-center bg-gray-100">
-                           <img src={payment.proof_url} alt="Proof of payment" className="max-w-full max-h-full object-contain" />
-                        </div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">{payment.method === 'Cash' ? 'Payment Details:' : 'Payment Proof:'}</p>
+                         {payment.method === 'Cash' ? (
+                            <div className="w-full p-4 border rounded-lg flex justify-center items-center bg-gray-100 text-gray-600 text-sm">
+                                {payment.status === 'pending' ? 'Homeowner will pay in cash at the admin office.' : 'Cash payment received at office.'}
+                            </div>
+                        ) : (
+                            <div className="w-full h-auto max-h-96 overflow-auto border rounded-lg flex justify-center items-center bg-gray-100">
+                               {payment.proof_url ? (
+                                   <img src={payment.proof_url} alt="Proof of payment" className="max-w-full max-h-full object-contain" />
+                               ) : (
+                                   <span className="text-sm text-gray-500 p-4">No proof of payment was uploaded.</span>
+                               )}
+                            </div>
+                        )}
                     </div>
                     
                     {isPendingReview && (

@@ -52,8 +52,8 @@ export interface Payment {
   due_id: string;
   user_id: string;
   amount: number;
-  method: 'GCash' | 'Maya' | 'Bank Transfer' | 'Credit Card';
-  proof_url: string;
+  method: 'GCash' | 'Maya' | 'Bank Transfer' | 'Credit Card' | 'Cash';
+  proof_url?: string;
   status: 'verified' | 'pending' | 'rejected';
   date_paid: string;
   notes?: string; // For rejection reason
