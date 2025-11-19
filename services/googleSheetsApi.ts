@@ -190,6 +190,15 @@ export const recordCashPaymentIntent = (dueId: string): Promise<Payment> => {
     return response.then(handleApiResponse);
 }
 
+export const recordAdminCashPayment = (dueId: string): Promise<Payment> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({ action: 'recordAdminCashPayment', payload: { dueId }})
+    });
+    return response.then(handleApiResponse);
+}
+
 export const updatePaymentStatus = (payload: UpdatePaymentStatusPayload): Promise<Payment> => {
      const response = fetch(SCRIPT_URL, {
         method: 'POST',

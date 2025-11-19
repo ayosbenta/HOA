@@ -3,6 +3,7 @@ import Card from '../components/ui/Card';
 import PaymentModal from '../components/modals/PaymentModal';
 import ReceiptModal from '../components/modals/ReceiptModal';
 import PaymentMethodModal from '../components/modals/PaymentMethodModal';
+import AdminRecordPaymentModal from '../components/modals/AdminRecordPaymentModal';
 import { getDuesForUser, getAllDues, recordCashPaymentIntent } from '../services/googleSheetsApi';
 import { Due, User, UserRole } from '../types';
 import { CreditCard, AlertTriangle } from 'lucide-react';
@@ -18,6 +19,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isMethodModalOpen, setIsMethodModalOpen] = useState(false);
+  const [isAdminRecordPaymentModalOpen, setIsAdminRecordPaymentModalOpen] = useState(false);
   const [selectedDue, setSelectedDue] = useState<Due | null>(null);
   const [isSubmittingCash, setIsSubmittingCash] = useState(false);
 
@@ -55,6 +57,12 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
     fetchDues();
   };
 
+  const handleAdminPaymentSuccess = () => {
+    setIsAdminRecordPaymentModalOpen(false);
+    setSelectedDue(null);
+    fetchDues();
+  };
+
   const handleModalUpdate = () => {
     setIsReceiptModalOpen(false);
     setSelectedDue(null);
@@ -87,6 +95,11 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
         setIsSubmittingCash(false);
       }
     }
+  };
+
+  const handleRecordPaymentClick = (due: Due) => {
+    setSelectedDue(due);
+    setIsAdminRecordPaymentModalOpen(true);
   };
 
 
@@ -145,10 +158,8 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
         if (payment?.status === 'pending') {
             return <button onClick={() => handleViewReceiptClick(due)} className="font-medium text-white bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded-md text-xs">Review Payment</button>;
         }
-        if (payment?.status === 'rejected') {
-            return <span className="font-medium text-orange-600 text-xs">Rejected</span>;
-        }
-        return <span className="text-gray-500 text-xs">Unpaid</span>;
+        // For rejected, unpaid, or overdue, allow admin to record a new payment.
+        return <button onClick={() => handleRecordPaymentClick(due)} className="font-medium text-white bg-brand-primary hover:bg-brand-dark px-3 py-1 rounded-md text-xs">Record Payment</button>;
     }
     return null;
   }
@@ -236,6 +247,12 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
         due={selectedDue}
         user={user}
         onUpdate={handleModalUpdate}
+      />
+      <AdminRecordPaymentModal
+        isOpen={isAdminRecordPaymentModalOpen}
+        onClose={() => setIsAdminRecordPaymentModalOpen(false)}
+        due={selectedDue}
+        onSuccess={handleAdminPaymentSuccess}
       />
     </>
   );

@@ -239,6 +239,15 @@ function doPost(e) {
           clearCache(CACHE_KEYS.USER_DUES(data.user_id));
         }
         break;
+      case 'recordAdminCashPayment':
+        data = recordAdminCashPayment(payload);
+        if (data && data.user_id) {
+          clearCache(CACHE_KEYS.ALL_DUES);
+          clearCache(CACHE_KEYS.ADMIN_DASHBOARD);
+          clearCache(CACHE_KEYS.USER_DUES(data.user_id));
+          clearCache(CACHE_KEYS.USER_DASHBOARD(data.user_id));
+        }
+        break;
       case 'updatePaymentStatus':
         data = updatePaymentStatus(payload);
         clearCache(CACHE_KEYS.ALL_DUES);
@@ -800,6 +809,55 @@ function recordCashPaymentIntent(payload) {
   };
 
   const newRow = headers.map(header => newPayment[String(header).trim()] !== undefined ? newPayment[String(header).trim()] : null);
+  paymentsSheet.appendRow(newRow);
+
+  return newPayment;
+}
+
+function recordAdminCashPayment(payload) {
+  const { dueId } = payload;
+  if (!dueId) {
+    throw new Error("Due ID is required to record a cash payment.");
+  }
+
+  const duesSheet = getSheetOrThrow("Dues");
+  const duesData = duesSheet.getDataRange().getValues();
+  const duesHeaders = duesData[0];
+  const dueIdIndex = duesHeaders.indexOf('due_id');
+  const dueRowIndex = duesData.findIndex(row => row[dueIdIndex] === dueId);
+
+  if (dueRowIndex === -1) {
+    throw new Error("Due not found.");
+  }
+  
+  const dueRow = duesData[dueRowIndex];
+  const dueObj = duesHeaders.reduce((obj, header, i) => {
+    obj[header] = dueRow[i];
+    return obj;
+  }, {});
+  
+  // Update the due status to 'paid'
+  const dueStatusIndex = duesHeaders.indexOf('status');
+  duesSheet.getRange(dueRowIndex + 1, dueStatusIndex + 1).setValue('paid');
+
+  // Create a new 'verified' payment record
+  const paymentsSheet = getSheetOrThrow("Payments");
+  const paymentsHeaders = paymentsSheet.getRange(1, 1, 1, paymentsSheet.getLastColumn()).getValues()[0];
+  const newPaymentId = 'pay_' + new Date().getTime();
+  
+  const newPayment = {
+    payment_id: newPaymentId,
+    due_id: dueId,
+    user_id: dueObj.user_id,
+    amount: dueObj.total_due,
+    method: 'Cash',
+    proof_url: '',
+    status: 'verified',
+    date_paid: new Date().toISOString(),
+    notes: 'Paid in cash at office. Recorded by admin.'
+  };
+
+  const newRow = paymentsHeaders.map(header => newPayment[String(header).trim()] !== undefined ? newPayment[String(header).trim()] : null);
   paymentsSheet.appendRow(newRow);
 
   return newPayment;
