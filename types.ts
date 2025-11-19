@@ -45,6 +45,10 @@ export interface Due {
   status: 'paid' | 'unpaid' | 'overdue';
   notes?: string;
   payment?: Payment | null; // Associated payment
+  // For admin view
+  full_name?: string;
+  block?: number;
+  lot?: number;
 }
 
 export interface Payment {

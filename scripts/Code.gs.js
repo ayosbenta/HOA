@@ -412,22 +412,32 @@ function getDuesForUser(userId) {
 
 function getAllDues() {
     const duesSheet = getSheetOrThrow("Dues");
-    // fix: Safely get the Payments sheet without throwing an error if it's missing.
     const paymentsSheet = SS.getSheetByName("Payments");
+    const usersSheet = getSheetOrThrow("Users");
 
     const allDues = sheetToJSON(duesSheet, ['due_id', 'user_id']);
-    // fix: If the Payments sheet doesn't exist, treat the payments list as empty.
     const allPayments = paymentsSheet ? sheetToJSON(paymentsSheet, ['payment_id', 'due_id']) : [];
+    const allUsers = sheetToJSON(usersSheet, ['user_id']);
+    
+    const userMap = allUsers.reduce((map, user) => {
+      map[user.user_id] = user;
+      return map;
+    }, {});
 
-    const duesWithPayments = allDues.map(due => {
+    const duesWithDetails = allDues.map(due => {
         const duePayments = allPayments.filter(p => p.due_id === due.due_id).sort((a, b) => new Date(b.date_paid) - new Date(a.date_paid));
+        const homeowner = userMap[due.user_id];
+
         return {
             ...due,
-            payment: duePayments.length > 0 ? duePayments[0] : null
+            payment: duePayments.length > 0 ? duePayments[0] : null,
+            full_name: homeowner ? homeowner.full_name : 'Unknown',
+            block: homeowner ? homeowner.block : 'N/A',
+            lot: homeowner ? homeowner.lot : 'N/A'
         };
     });
 
-    return duesWithPayments;
+    return duesWithDetails;
 }
 
 function getVisitorsForHomeowner(homeownerId) {
@@ -674,12 +684,21 @@ function generateMonthlyDuesForAllHomeowners(settings) {
     
     const effectiveDate = new Date(settings.effectiveDate);
     effectiveDate.setUTCHours(12, 0, 0, 0); // Avoid timezone issues
-    const billingMonth = effectiveDate.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const billingMonthISO = effectiveDate.toISOString();
     
-    Logger.log(`Generating dues for billing month: ${billingMonth}`);
+    Logger.log(`Generating dues for billing month starting: ${billingMonthISO}`);
 
     const existingDuesForMonth = new Set(
-        allDues.filter(d => d.billing_month === billingMonth).map(d => d.user_id)
+        allDues.filter(d => {
+          if (!d.billing_month) return false;
+          try {
+            const dueBillingDate = new Date(d.billing_month);
+            return dueBillingDate.getUTCFullYear() === effectiveDate.getUTCFullYear() &&
+                   dueBillingDate.getUTCMonth() === effectiveDate.getUTCMonth();
+          } catch(e) {
+            return false;
+          }
+        }).map(d => d.user_id)
     );
 
     Logger.log(`${existingDuesForMonth.size} users already have dues for this month.`);
@@ -693,7 +712,7 @@ function generateMonthlyDuesForAllHomeowners(settings) {
             const newDue = {
                 due_id: newDueId,
                 user_id: homeowner.user_id,
-                billing_month: billingMonth,
+                billing_month: billingMonthISO,
                 amount: settings.monthlyDue,
                 penalty: 0,
                 total_due: settings.monthlyDue,
@@ -999,10 +1018,10 @@ function setupMockData() {
   // === Set up Dues sheet ===
   const duesHeaders = ['due_id', 'user_id', 'billing_month', 'amount', 'penalty', 'total_due', 'status', 'notes'];
   const duesData = [
-    ['due_001', 'user_002', 'October 2023', 2000, 100, 2100, 'overdue', ''],
-    ['due_002', 'user_002', 'September 2023', 2000, 0, 2000, 'paid', 'Paid via GCash'],
-    ['due_003', 'user_003', 'October 2023', 2000, 0, 2000, 'unpaid', ''],
-    ['due_004', 'user_003', 'September 2023', 2000, 0, 2000, 'paid', '']
+    ['due_001', 'user_002', '2023-10-01T00:00:00.000Z', 2000, 100, 2100, 'overdue', ''],
+    ['due_002', 'user_002', '2023-09-01T00:00:00.000Z', 2000, 0, 2000, 'paid', 'Paid via GCash'],
+    ['due_003', 'user_003', '2023-10-01T00:00:00.000Z', 2000, 0, 2000, 'unpaid', ''],
+    ['due_004', 'user_003', '2023-09-01T00:00:00.000Z', 2000, 0, 2000, 'paid', '']
   ];
   duesSheet.getRange(1, 1, 1, duesHeaders.length).setValues([duesHeaders]).setFontWeight('bold');
   if (duesData.length > 0) {

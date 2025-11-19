@@ -170,8 +170,13 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
               <table className="w-full text-sm text-left text-gray-500">
               <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                   <tr>
-                      <th scope="col" className="px-6 py-3">Billing Month</th>
-                      {user.role === UserRole.ADMIN && <th scope="col" className="px-6 py-3">Homeowner</th>}
+                      <th scope="col" className="px-6 py-3">Billing Date</th>
+                      {user.role === UserRole.ADMIN && (
+                        <>
+                            <th scope="col" className="px-6 py-3">Homeowner</th>
+                            <th scope="col" className="px-6 py-3">Unit</th>
+                        </>
+                      )}
                       <th scope="col" className="px-6 py-3">Total Due</th>
                       <th scope="col" className="px-6 py-3">Status</th>
                       <th scope="col" className="px-6 py-3">Action</th>
@@ -179,12 +184,24 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
               </thead>
               <tbody>
                   {loading && dues.length > 0 && (
-                      <tr><td colSpan={5} className="text-center p-4 text-sm text-gray-500">Refreshing data...</td></tr>
+                      <tr><td colSpan={user.role === UserRole.ADMIN ? 6 : 4} className="text-center p-4 text-sm text-gray-500">Refreshing data...</td></tr>
                   )}
                   {dues.map((due) => (
                       <tr key={due.due_id} className="bg-white border-b hover:bg-gray-50">
-                          <td className="px-6 py-4 font-medium text-gray-900">{due.billing_month}</td>
-                          {user.role === UserRole.ADMIN && <td className="px-6 py-4">User {due.user_id.slice(0,5)}</td>}
+                          <td className="px-6 py-4 font-medium text-gray-900">
+                            {new Date(due.billing_month).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric',
+                                timeZone: 'UTC'
+                            })}
+                          </td>
+                          {user.role === UserRole.ADMIN && (
+                            <>
+                                <td className="px-6 py-4">{due.full_name}</td>
+                                <td className="px-6 py-4">{`B${due.block} L${due.lot}`}</td>
+                            </>
+                          )}
                           <td className="px-6 py-4 font-bold">₱{due.total_due.toFixed(2)}</td>
                           <td className="px-6 py-4">{getStatusChip(due)}</td>
                           <td className="px-6 py-4">
