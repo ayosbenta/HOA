@@ -7,6 +7,7 @@ const FeeSchedulePage: React.FC = () => {
     const [monthlyDue, setMonthlyDue] = useState<number>(0);
     const [penalty, setPenalty] = useState<number>(0);
     const [effectiveDate, setEffectiveDate] = useState('');
+    const [initialEffectiveDate, setInitialEffectiveDate] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -18,7 +19,9 @@ const FeeSchedulePage: React.FC = () => {
                 const schedule = await getAppSettings();
                 setMonthlyDue(schedule.monthlyDue);
                 setPenalty(schedule.penalty);
-                setEffectiveDate(schedule.effectiveDate || new Date().toISOString().split('T')[0]);
+                const loadedDate = schedule.effectiveDate || new Date().toISOString().split('T')[0];
+                setEffectiveDate(loadedDate);
+                setInitialEffectiveDate(loadedDate);
             } catch (error) {
                 console.error("Failed to fetch fee schedule", error);
             } finally {
@@ -29,11 +32,29 @@ const FeeSchedulePage: React.FC = () => {
     }, []);
     
     const handleSaveChanges = async () => {
+        const dateChanged = effectiveDate !== initialEffectiveDate;
+
+        if (dateChanged) {
+            const dateObj = new Date(effectiveDate);
+            const userTimezoneOffset = dateObj.getTimezoneOffset() * 60000;
+            const localDate = new Date(dateObj.getTime() + userTimezoneOffset);
+            const billingMonth = localDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+            
+            const confirmationMessage = `You've changed the effective date. This will automatically generate billing statements for all active homeowners for ${billingMonth}.\n\nThis action cannot be undone.\n\nDo you want to proceed?`;
+            
+            if (!window.confirm(confirmationMessage)) {
+                return; // User canceled
+            }
+        }
+
         setSaving(true);
         try {
             await updateAppSettings({ monthlyDue, penalty, effectiveDate });
+            if (dateChanged) {
+                setInitialEffectiveDate(effectiveDate);
+            }
             setShowSuccess(true);
-            setTimeout(() => setShowSuccess(false), 2000);
+            setTimeout(() => setShowSuccess(false), 3000);
         } catch (error) {
             console.error("Failed to update fee schedule", error);
             alert("Error: Could not save fee schedule.");
@@ -78,7 +99,7 @@ const FeeSchedulePage: React.FC = () => {
                             onChange={(e) => setEffectiveDate(e.target.value)}
                         />
                     </div>
-                    <p className="mt-2 text-xs text-gray-500">The new fee schedule will apply starting from this date.</p>
+                    <p className="mt-2 text-xs text-gray-500">Changing this date will generate new monthly dues for all homeowners.</p>
                 </div>
 
                 <div>

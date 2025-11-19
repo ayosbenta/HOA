@@ -606,6 +606,7 @@ function getAppSettings() {
 }
 
 function updateAppSettings(newSettings) {
+    const oldSettings = getAppSettings();
     const settingsSheet = getSheetOrThrow("Settings");
     const settingsRange = settingsSheet.getDataRange();
     const settingsValues = settingsRange.getValues();
@@ -622,11 +623,81 @@ function updateAppSettings(newSettings) {
         }
     });
     
-    // Ensure all pending changes are written before reading again to prevent race conditions.
     SpreadsheetApp.flush(); 
 
-    return getAppSettings();
+    const currentSettings = getAppSettings();
+
+    if (newSettings.effectiveDate && newSettings.effectiveDate !== oldSettings.effectiveDate) {
+        Logger.log(`Effective date changed from "${oldSettings.effectiveDate}" to "${newSettings.effectiveDate}". Triggering due generation.`);
+        generateMonthlyDuesForAllHomeowners(currentSettings);
+    }
+
+    return currentSettings;
 }
+
+function generateMonthlyDuesForAllHomeowners(settings) {
+    if (!settings || !settings.effectiveDate || !settings.monthlyDue) {
+        Logger.log("Skipping due generation: Missing effectiveDate or monthlyDue in settings.");
+        return;
+    }
+
+    const usersSheet = getSheetOrThrow("Users");
+    const duesSheet = getSheetOrThrow("Dues");
+
+    const allUsers = sheetToJSON(usersSheet);
+    const activeHomeowners = allUsers.filter(u => u.role === 'Homeowner' && u.status === 'active');
+    
+    if (activeHomeowners.length === 0) {
+        Logger.log("No active homeowners found to generate dues for.");
+        return;
+    }
+    
+    const allDues = sheetToJSON(duesSheet);
+    
+    const effectiveDate = new Date(settings.effectiveDate);
+    effectiveDate.setUTCHours(12, 0, 0, 0); // Avoid timezone issues
+    const billingMonth = effectiveDate.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    
+    Logger.log(`Generating dues for billing month: ${billingMonth}`);
+
+    const existingDuesForMonth = new Set(
+        allDues.filter(d => d.billing_month === billingMonth).map(d => d.user_id)
+    );
+
+    Logger.log(`${existingDuesForMonth.size} users already have dues for this month.`);
+
+    const duesHeaders = duesSheet.getRange(1, 1, 1, duesSheet.getLastColumn()).getValues()[0];
+    const newDuesRows = [];
+
+    activeHomeowners.forEach(homeowner => {
+        if (!existingDuesForMonth.has(homeowner.user_id)) {
+            const newDueId = 'due_' + new Date().getTime() + '_' + homeowner.user_id.slice(-4);
+            const newDue = {
+                due_id: newDueId,
+                user_id: homeowner.user_id,
+                billing_month: billingMonth,
+                amount: settings.monthlyDue,
+                penalty: 0,
+                total_due: settings.monthlyDue,
+                status: 'unpaid',
+                notes: ''
+            };
+
+            const newRow = duesHeaders.map(header => newDue[String(header).trim()] !== undefined ? newDue[String(header).trim()] : null);
+            newDuesRows.push(newRow);
+        }
+    });
+
+    if (newDuesRows.length > 0) {
+        Logger.log(`Generating ${newDuesRows.length} new due entries.`);
+        const lastRow = duesSheet.getLastRow();
+        duesSheet.getRange(lastRow + 1, 1, newDuesRows.length, newDuesRows[0].length).setValues(newDuesRows);
+        clearCache(CACHE_KEYS.ALL_DUES);
+    } else {
+        Logger.log("No new dues needed to be generated.");
+    }
+}
+
 
 function submitPayment(payload) {
   const { dueId, userId, amount, method, proofUrl } = payload;
