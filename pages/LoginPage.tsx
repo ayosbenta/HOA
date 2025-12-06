@@ -75,7 +75,7 @@ Please check the following:
             <div className="inline-block p-3 bg-brand-light rounded-full mb-4">
                 <Building className="h-10 w-10 text-brand-primary" />
             </div>
-            <h1 className="text-3xl font-extrabold text-brand-dark">HOAConnect PH</h1>
+            <h1 className="text-3xl font-extrabold text-brand-dark">Deca Homes Phase 1</h1>
             <p className="mt-2 text-gray-600">Sign in to your account</p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>

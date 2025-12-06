@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { X, LogOut, LucideIcon } from 'lucide-react';
@@ -32,7 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ navItems, currentPage, setCurrentPage
       <aside className={`absolute md:relative inset-y-0 left-0 bg-brand-dark text-white w-64 space-y-6 py-7 px-2 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out z-40 flex flex-col`}>
         <div className="px-4 flex justify-between items-center">
             <a href="#" className="text-white text-2xl font-extrabold tracking-wider">
-              HOA<span className="text-brand-secondary">Connect</span>
+              Deca Homes <span className="text-brand-secondary">Phase 1</span>
             </a>
             <button onClick={() => setIsOpen(false)} className="md:hidden text-white">
                 <X size={24} />

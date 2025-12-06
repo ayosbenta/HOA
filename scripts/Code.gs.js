@@ -1,5 +1,5 @@
 // =================================================================
-// HOAConnect PH - Google Apps Script Backend
+// Deca Homes Phase 1 - Google Apps Script Backend
 // =================================================================
 // INSTRUCTIONS:
 // 1. Create a new Google Sheet.
