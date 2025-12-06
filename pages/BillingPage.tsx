@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../components/ui/Card';
 import PaymentModal from '../components/modals/PaymentModal';
@@ -196,6 +197,34 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
     return true;
   });
 
+  // Calculate Summary based on filtered dues
+  const summary = filteredDues.reduce((acc, due) => {
+    // Verified Payments (Collected)
+    if (due.status === 'paid' || due.payment?.status === 'verified') {
+        const paidAmount = due.payment ? due.payment.amount : due.total_due;
+        acc.totalPaid += paidAmount;
+
+        if (due.payment?.method === 'Cash') {
+            acc.totalCash += paidAmount;
+        } else if (due.payment?.method === 'GCash') {
+            acc.totalGCash += paidAmount;
+        } else {
+             // Fallback if method is missing but status is paid (e.g. older records), assume Cash or just add to total
+             // We won't add to specific cash/gcash buckets if unknown, but it is in totalPaid
+        }
+    } 
+    // Unpaid/Overdue
+    else if (due.status === 'unpaid' || due.status === 'overdue') {
+        acc.totalUnpaid += due.total_due;
+    }
+    return acc;
+  }, {
+    totalCash: 0,
+    totalGCash: 0,
+    totalPaid: 0,
+    totalUnpaid: 0
+  });
+
   return (
     <>
       <style>
@@ -377,6 +406,35 @@ const BillingPage: React.FC<BillingPageProps> = ({ user }) => {
             </table>
             )}
             </div>
+
+            {/* Collection Summary Section - Visible only in Print */}
+            {user.role === UserRole.ADMIN && (
+                <div className="print-only mt-6 px-6 pb-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 border-b pb-2">Collection Summary</h3>
+                    <div className="grid grid-cols-2 gap-y-4 gap-x-12 text-sm">
+                        
+                        <div className="flex justify-between border-b border-dotted border-gray-300 pb-1">
+                            <span className="text-gray-600">Total Collections (Cash):</span>
+                            <span className="font-bold">₱{summary.totalCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+
+                        <div className="flex justify-between border-b border-dotted border-gray-300 pb-1">
+                             <span className="text-gray-600">Total Collections (GCash):</span>
+                             <span className="font-bold">₱{summary.totalGCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+
+                        <div className="flex justify-between border-b border-gray-400 pb-1">
+                             <span className="text-gray-800 font-semibold">Total Paid Amount:</span>
+                             <span className="font-bold text-green-700">₱{summary.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+
+                        <div className="flex justify-between border-b border-gray-400 pb-1">
+                             <span className="text-gray-800 font-semibold">Total Unpaid Amount:</span>
+                             <span className="font-bold text-red-700">₱{summary.totalUnpaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* Print Footer */}
             <div className="print-only mt-8 text-center text-xs text-gray-400">
