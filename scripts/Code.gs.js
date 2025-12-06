@@ -33,6 +33,9 @@
 //
 // Sheet: Amenity Reservations
 // Columns: reservation_id, user_id, amenity_name, reservation_date, start_time, end_time, status, notes
+//
+// Sheet: CCTV
+// Columns: cctv_id, name, stream_url, created_at
 // =================================================================
 
 const SS = SpreadsheetApp.getActiveSpreadsheet();
@@ -78,6 +81,7 @@ const CACHE_KEYS = {
   ALL_USERS: 'all_users',
   APP_SETTINGS: 'app_settings',
   ALL_RESERVATIONS: 'all_reservations',
+  CCTV_LIST: 'cctv_list',
   USER_DUES: (userId) => `dues_${userId}`,
   USER_VISITORS: (homeownerId) => `visitors_${homeownerId}`,
   USER_DASHBOARD: (userId) => `dashboard_${userId}`,
@@ -167,6 +171,9 @@ function doGet(e) {
         break;
       case 'getAllAmenityReservations':
         data = getCached(CACHE_KEYS.ALL_RESERVATIONS, getAllAmenityReservations);
+        break;
+      case 'getCCTVList':
+        data = getCached(CACHE_KEYS.CCTV_LIST, getCCTVList);
         break;
       default:
         return jsonResponse({ error: 'Invalid GET action: ' + action }, false);
@@ -272,6 +279,18 @@ function doPost(e) {
           clearCache(CACHE_KEYS.USER_DASHBOARD(data.user_id));
         }
         clearCache(CACHE_KEYS.ADMIN_DASHBOARD);
+        break;
+      case 'createCCTV':
+        data = createCCTV(payload);
+        clearCache(CACHE_KEYS.CCTV_LIST);
+        break;
+      case 'updateCCTV':
+        data = updateCCTV(payload);
+        clearCache(CACHE_KEYS.CCTV_LIST);
+        break;
+      case 'deleteCCTV':
+        data = deleteCCTV(payload.cctvId);
+        clearCache(CACHE_KEYS.CCTV_LIST);
         break;
       default:
         return jsonResponse({ error: 'Invalid POST action: ' + action }, false);
@@ -993,6 +1012,103 @@ function updateAmenityReservationStatus(payload) {
     throw new Error('Reservation not found');
 }
 
+// --- CCTV FUNCTIONS ---
+
+function getCCTVList() {
+    const sheet = SS.getSheetByName("CCTV");
+    if (!sheet) return [];
+    
+    try {
+        return sheetToJSON(sheet, ['cctv_id']);
+    } catch (e) {
+        // If headers are missing (sheetToJSON throws), return empty list so the app doesn't crash.
+        Logger.log("CCTV sheet exists but is invalid/empty. Returning empty list. Error: " + e.message);
+        return [];
+    }
+}
+
+function createCCTV(payload) {
+    const { name, stream_url } = payload;
+    if (!name || !stream_url) {
+        throw new Error("Camera name and stream URL are required.");
+    }
+
+    let sheet = SS.getSheetByName("CCTV");
+    const headersList = ['cctv_id', 'name', 'stream_url', 'created_at'];
+
+    // Auto-create sheet if missing
+    if (!sheet) {
+        sheet = SS.insertSheet("CCTV");
+        sheet.getRange(1, 1, 1, headersList.length).setValues([headersList]).setFontWeight('bold');
+        sheet.setFrozenRows(1);
+    } else {
+        // Auto-fix headers if sheet exists but is empty
+        if (sheet.getLastRow() === 0) {
+             sheet.getRange(1, 1, 1, headersList.length).setValues([headersList]).setFontWeight('bold');
+             sheet.setFrozenRows(1);
+        }
+    }
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    const newId = 'cam_' + new Date().getTime();
+    const newCamera = {
+        cctv_id: newId,
+        name: name,
+        stream_url: stream_url,
+        created_at: new Date().toISOString()
+    };
+
+    const newRow = headers.map(header => newCamera[String(header).trim()] !== undefined ? newCamera[String(header).trim()] : null);
+    sheet.appendRow(newRow);
+
+    return newCamera;
+}
+
+function updateCCTV(payload) {
+  const { cctv_id, name, stream_url } = payload;
+  if (!cctv_id || !name || !stream_url) {
+      throw new Error("CCTV ID, name, and stream URL are required for update.");
+  }
+
+  const sheet = getSheetOrThrow("CCTV");
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idIndex = headers.indexOf('cctv_id');
+
+  const rowIndex = data.findIndex(row => row[idIndex] === cctv_id);
+
+  if (rowIndex !== -1) {
+      const nameIndex = headers.indexOf('name');
+      const urlIndex = headers.indexOf('stream_url');
+      
+      sheet.getRange(rowIndex + 1, nameIndex + 1).setValue(name);
+      sheet.getRange(rowIndex + 1, urlIndex + 1).setValue(stream_url);
+
+      const updatedRow = sheet.getRange(rowIndex + 1, 1, 1, headers.length).getValues()[0];
+       return headers.reduce((obj, header, i) => {
+          obj[header] = updatedRow[i];
+          return obj;
+      }, {});
+  }
+  throw new Error('Camera not found');
+}
+
+function deleteCCTV(cctvId) {
+    const sheet = getSheetOrThrow("CCTV");
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const idIndex = headers.indexOf('cctv_id');
+
+    const rowIndex = data.findIndex(row => row[idIndex] === cctvId);
+
+    if (rowIndex !== -1) {
+        sheet.deleteRow(rowIndex + 1);
+        return { success: true };
+    }
+    throw new Error('Camera not found');
+}
+
 // --- UTILITY FUNCTIONS ---
 
 function sheetToJSON(sheet, requiredHeaders = []) {
@@ -1044,6 +1160,7 @@ function setupMockData() {
   const visitorsSheet = getOrCreateSheet("Visitors");
   const settingsSheet = getOrCreateSheet("Settings");
   const amenityReservationsSheet = getOrCreateSheet("Amenity Reservations");
+  const cctvSheet = getOrCreateSheet("CCTV");
   
   const today = new Date().toISOString();
 
@@ -1139,6 +1256,17 @@ function setupMockData() {
   }
   amenityReservationsSheet.setFrozenRows(1);
 
+  // === Set up CCTV sheet ===
+  const cctvHeaders = ['cctv_id', 'name', 'stream_url', 'created_at'];
+  const cctvData = [
+    ['cam_001', 'Gate 1 Entrance', 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8', today], // Sample HLS stream
+    ['cam_002', 'Clubhouse Area', 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8', today]
+  ];
+  cctvSheet.getRange(1, 1, 1, cctvHeaders.length).setValues([cctvHeaders]).setFontWeight('bold');
+  if (cctvData.length > 0) {
+    cctvSheet.getRange(2, 1, cctvData.length, cctvData[0].length).setValues(cctvData);
+  }
+  cctvSheet.setFrozenRows(1);
 
   SpreadsheetApp.flush();
   Logger.log('Mock data and headers have been set up successfully!');

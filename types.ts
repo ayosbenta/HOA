@@ -89,6 +89,18 @@ export interface AmenityReservation {
   notes?: string;
 }
 
+export interface CCTV {
+  cctv_id: string;
+  name: string;
+  stream_url: string;
+  created_at: string;
+}
+
+export interface CCTVPayload {
+  name: string;
+  stream_url: string;
+}
+
 export interface AdminDashboardData {
     duesCollected: number;
     pendingApprovalsCount: number;

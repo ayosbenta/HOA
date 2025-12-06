@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
-import { getHomeownerDashboardData } from '../services/googleSheetsApi';
+import { getHomeownerDashboardData, recordCashPaymentIntent } from '../services/googleSheetsApi';
 import { Announcement, Due } from '../types';
 import { DollarSign, Bell, AlertCircle } from 'lucide-react';
+import PaymentMethodModal from '../components/modals/PaymentMethodModal';
+import PaymentModal from '../components/modals/PaymentModal';
 
 const HomeownerDashboard: React.FC = () => {
     const { user } = useAuth();
@@ -12,31 +14,86 @@ const HomeownerDashboard: React.FC = () => {
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            if (user) {
-                try {
-                    setLoading(true);
-                    const data = await getHomeownerDashboardData(user.user_id);
-                    setDues(data.dues);
-                    setAnnouncements(data.announcements);
-                    setPendingRequestsCount(data.pendingRequestsCount);
-                } catch (error) {
-                    console.error("Failed to fetch dashboard data", error);
-                } finally {
-                    setLoading(false);
-                }
-            }
-        };
+    // Payment Modal States
+    const [isMethodModalOpen, setIsMethodModalOpen] = useState(false);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [isSubmittingCash, setIsSubmittingCash] = useState(false);
+    const [selectedDue, setSelectedDue] = useState<Due | null>(null);
 
+    const fetchData = useCallback(async () => {
+        if (user) {
+            try {
+                // Only set loading true if it's the initial load to avoid UI flicker on updates
+                if (dues.length === 0) setLoading(true);
+                
+                const data = await getHomeownerDashboardData(user.user_id);
+                setDues(data.dues);
+                setAnnouncements(data.announcements);
+                setPendingRequestsCount(data.pendingRequestsCount);
+            } catch (error) {
+                console.error("Failed to fetch dashboard data", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+    }, [user, dues.length]);
+
+    useEffect(() => {
         fetchData();
-    }, [user]);
+    }, [fetchData]);
+
+    const handlePayNowClick = (due: Due) => {
+        setSelectedDue(due);
+        setIsMethodModalOpen(true);
+    };
+
+    const handleSelectGcash = () => {
+        setIsMethodModalOpen(false);
+        setIsPaymentModalOpen(true);
+    };
+
+    const handleSelectCash = async () => {
+        if (!selectedDue) return;
+
+        const confirmed = window.confirm(
+            'You have selected to pay in cash. Please proceed to the HOA admin office during office hours to complete your payment.\n\nYour payment will be marked as "Pending" until an admin verifies receipt of your payment.'
+        );
+
+        if (confirmed) {
+            setIsSubmittingCash(true);
+            try {
+                await recordCashPaymentIntent(selectedDue.due_id);
+                setIsMethodModalOpen(false);
+                setSelectedDue(null);
+                fetchData();
+            } catch (error) {
+                console.error("Failed to record cash payment intent:", error);
+                alert(`Error: ${error instanceof Error ? error.message : 'Could not proceed with cash payment.'}`);
+            } finally {
+                setIsSubmittingCash(false);
+            }
+        }
+    };
+
+    const handlePaymentSuccess = () => {
+        setIsPaymentModalOpen(false);
+        setSelectedDue(null);
+        fetchData();
+    };
 
     if (loading) {
         return <div className="text-center p-8">Loading dashboard...</div>;
     }
 
-    const outstandingDue = dues.find(d => d.status === 'unpaid' || d.status === 'overdue');
+    // Find the most relevant outstanding due (Overdue or Unpaid)
+    // Priority: Overdue -> Unpaid
+    const outstandingDue = dues
+        .filter(d => d.status === 'overdue' || d.status === 'unpaid')
+        .sort((a, b) => {
+             if (a.status === 'overdue' && b.status !== 'overdue') return -1;
+             if (b.status === 'overdue' && a.status !== 'overdue') return 1;
+             return new Date(a.billing_month).getTime() - new Date(b.billing_month).getTime();
+        })[0];
 
     return (
         <div className="space-y-6">
@@ -54,7 +111,7 @@ const HomeownerDashboard: React.FC = () => {
                                 {outstandingDue ? (
                                     <>
                                         <p className="text-3xl font-bold text-gray-900">₱{outstandingDue.total_due.toLocaleString()}</p>
-                                        <p className="text-gray-600">Due for {outstandingDue.billing_month}</p>
+                                        <p className="text-gray-600">Due for {new Date(outstandingDue.billing_month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
                                         {outstandingDue.status === 'overdue' && <span className="text-sm font-semibold text-red-600 flex items-center mt-1"><AlertCircle size={16} className="mr-1"/> OVERDUE</span>}
                                     </>
                                 ) : (
@@ -63,9 +120,20 @@ const HomeownerDashboard: React.FC = () => {
                             </div>
                         </div>
                         {outstandingDue && (
-                            <button className="mt-4 w-full sm:w-auto px-6 py-2 bg-brand-primary text-white font-semibold rounded-lg hover:bg-brand-dark transition-colors">
-                                Pay Now
-                            </button>
+                            <div className="mt-4">
+                                {outstandingDue.payment?.status === 'pending' ? (
+                                    <button disabled className="w-full sm:w-auto px-6 py-2 bg-gray-300 text-gray-500 font-semibold rounded-lg cursor-not-allowed">
+                                        {outstandingDue.payment.method === 'Cash' ? 'Pending Cash Payment' : 'Pending Verification'}
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={() => handlePayNowClick(outstandingDue)}
+                                        className="w-full sm:w-auto px-6 py-2 bg-brand-primary text-white font-semibold rounded-lg hover:bg-brand-dark transition-colors"
+                                    >
+                                        {outstandingDue.payment?.status === 'rejected' ? 'Resubmit Payment' : 'Pay Now'}
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </Card>
                 </div>
@@ -98,6 +166,22 @@ const HomeownerDashboard: React.FC = () => {
                     )) : <p className="text-gray-500">No new announcements.</p>}
                 </div>
             </Card>
+
+            <PaymentMethodModal
+                isOpen={isMethodModalOpen}
+                onClose={() => setIsMethodModalOpen(false)}
+                due={selectedDue}
+                onSelectGcash={handleSelectGcash}
+                onSelectCash={handleSelectCash}
+                isSubmittingCash={isSubmittingCash}
+            />
+
+            <PaymentModal 
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                due={selectedDue}
+                onSuccess={handlePaymentSuccess}
+            />
         </div>
     );
 };

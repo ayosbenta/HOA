@@ -13,8 +13,9 @@ import SettingsPage from './pages/SettingsPage';
 import ManageRolesPage from './pages/ManageRolesPage';
 import FeeSchedulePage from './pages/FeeSchedulePage';
 import AmenitiesPage from './pages/AmenitiesPage';
+import CCTVPage from './pages/CCTVPage';
 import { UserRole } from './types';
-import { House, CreditCard, Users, ShieldCheck, Settings, Bell, CalendarCheck } from 'lucide-react';
+import { House, CreditCard, Users, ShieldCheck, Settings, Bell, CalendarCheck, Video } from 'lucide-react';
 import RegistrationPage from './pages/RegistrationPage';
 
 const App: React.FC = () => {
@@ -52,6 +53,7 @@ const App: React.FC = () => {
     const commonItems = [
       { name: 'Dashboard', icon: House },
       { name: 'Announcements', icon: Bell },
+      { name: 'CCTV', icon: Video },
     ];
 
     if (role === UserRole.ADMIN) {
@@ -77,6 +79,7 @@ const App: React.FC = () => {
     return [
         { name: 'Dashboard', icon: House },
         { name: 'Visitors Log', icon: ShieldCheck },
+        { name: 'CCTV', icon: Video },
     ]
   };
   
@@ -98,6 +101,8 @@ const App: React.FC = () => {
         return <VisitorsPage user={user} />;
       case 'Amenities':
         return <AmenitiesPage user={user} viewReservationId={viewItemId} onViewComplete={() => setViewItemId(null)} />;
+      case 'CCTV':
+        return <CCTVPage />;
       case 'Settings':
         return <SettingsPage onNavigate={setCurrentPage} />;
       case 'Manage Roles':

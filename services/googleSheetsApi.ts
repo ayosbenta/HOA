@@ -1,4 +1,4 @@
-import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData, AnnouncementPayload, Payment } from '../types';
+import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData, AnnouncementPayload, Payment, CCTV, CCTVPayload } from '../types';
 
 // IMPORTANT: Replace this with your own Google Apps Script Web App URL
 // 1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/1VVSb9V6vLcG97GV6uu7Z0-ok0tfoJh13-V5OLOgzw3I/edit
@@ -232,6 +232,39 @@ export const updateAmenityReservationStatus = (reservationId: string, status: Am
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'updateAmenityReservationStatus', payload: { reservationId, status } }),
+    });
+    return response.then(handleApiResponse);
+};
+
+// --- CCTV API ---
+
+export const getCCTVList = (): Promise<CCTV[]> => {
+    return fetch(`${SCRIPT_URL}?action=getCCTVList`).then(handleApiResponse);
+};
+
+export const createCCTV = (payload: CCTVPayload): Promise<CCTV> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'createCCTV', payload }),
+    });
+    return response.then(handleApiResponse);
+};
+
+export const updateCCTV = (payload: CCTV): Promise<CCTV> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'updateCCTV', payload }),
+    });
+    return response.then(handleApiResponse);
+};
+
+export const deleteCCTV = (cctvId: string): Promise<{ success: boolean }> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'deleteCCTV', payload: { cctvId } }),
     });
     return response.then(handleApiResponse);
 };
