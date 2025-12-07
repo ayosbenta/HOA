@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = 'Admin',
   HOMEOWNER = 'Homeowner',
@@ -112,4 +113,57 @@ export interface AdminDashboardData {
         type: string;
         date: string;
     }[];
+}
+
+// --- NEW FINANCIAL TYPES ---
+
+export interface Expense {
+    expense_id: string;
+    date: string;
+    category: 'Security' | 'Utilities' | 'Repairs & Maintenance' | 'Admin & Office' | 'Salaries / Allowances' | 'Miscellaneous' | 'Reserve Fund Contribution';
+    amount: number;
+    payee: string;
+    description: string;
+    created_by: string;
+}
+
+export interface ExpensePayload {
+    date: string;
+    category: string;
+    amount: number;
+    payee: string;
+    description: string;
+}
+
+export interface FinancialReportData {
+    totalRevenue: number;
+    totalExpenses: number;
+    netSurplus: number;
+    endingCashBalance: number;
+    
+    cashPosition: {
+        cashOnHand: number;
+        gcash: number;
+        bank: number; // Placeholder
+    };
+    
+    incomeBreakdown: {
+        dues: number;
+        penalties: number;
+        other: number;
+    };
+    
+    expenseBreakdown: { [category: string]: number };
+    
+    accountsReceivable: number; // Total unpaid dues
+    accountsReceivableList: {
+        name: string;
+        unit: string;
+        amount: number;
+        months: number;
+    }[];
+
+    reserveFundTotal: number;
+    
+    expensesLedger: Expense[];
 }

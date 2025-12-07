@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
@@ -14,8 +15,9 @@ import ManageRolesPage from './pages/ManageRolesPage';
 import FeeSchedulePage from './pages/FeeSchedulePage';
 import AmenitiesPage from './pages/AmenitiesPage';
 import CCTVPage from './pages/CCTVPage';
+import FinancialReportsPage from './pages/FinancialReportsPage';
 import { UserRole } from './types';
-import { House, CreditCard, Users, ShieldCheck, Settings, Bell, CalendarCheck, Video } from 'lucide-react';
+import { House, CreditCard, Users, ShieldCheck, Settings, Bell, CalendarCheck, Video, PieChart } from 'lucide-react';
 import RegistrationPage from './pages/RegistrationPage';
 
 const App: React.FC = () => {
@@ -60,6 +62,7 @@ const App: React.FC = () => {
       return [
         ...commonItems,
         { name: 'Billing', icon: CreditCard },
+        { name: 'Financial Reports', icon: PieChart },
         { name: 'Manage Roles', icon: Users },
         { name: 'Visitors Log', icon: ShieldCheck },
         { name: 'Amenities', icon: CalendarCheck },
@@ -96,6 +99,8 @@ const App: React.FC = () => {
         return <AnnouncementsPage />;
       case 'Billing':
         return <BillingPage user={user}/>;
+      case 'Financial Reports':
+        return <FinancialReportsPage />;
       case 'Visitors Pass':
       case 'Visitors Log':
         return <VisitorsPage user={user} />;

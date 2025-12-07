@@ -1,3 +1,4 @@
+
 // =================================================================
 // Deca Homes Phase 1 - Google Apps Script Backend
 // =================================================================
@@ -36,6 +37,9 @@
 //
 // Sheet: CCTV
 // Columns: cctv_id, name, stream_url, created_at
+//
+// Sheet: Expenses
+// Columns: expense_id, date, category, amount, payee, description, created_by
 // =================================================================
 
 const SS = SpreadsheetApp.getActiveSpreadsheet();
@@ -82,6 +86,7 @@ const CACHE_KEYS = {
   APP_SETTINGS: 'app_settings',
   ALL_RESERVATIONS: 'all_reservations',
   CCTV_LIST: 'cctv_list',
+  FINANCIAL_REPORT: 'financial_report',
   USER_DUES: (userId) => `dues_${userId}`,
   USER_VISITORS: (homeownerId) => `visitors_${homeownerId}`,
   USER_DASHBOARD: (userId) => `dashboard_${userId}`,
@@ -175,6 +180,9 @@ function doGet(e) {
       case 'getCCTVList':
         data = getCached(CACHE_KEYS.CCTV_LIST, getCCTVList);
         break;
+      case 'getFinancialData':
+        data = getCached(CACHE_KEYS.FINANCIAL_REPORT, getFinancialData);
+        break;
       default:
         return jsonResponse({ error: 'Invalid GET action: ' + action }, false);
     }
@@ -238,6 +246,7 @@ function doPost(e) {
         data = submitPayment(payload);
         clearCache(CACHE_KEYS.ALL_DUES);
         clearCache(CACHE_KEYS.USER_DUES(payload.userId));
+        clearCache(CACHE_KEYS.FINANCIAL_REPORT);
         break;
       case 'recordCashPaymentIntent':
         data = recordCashPaymentIntent(payload);
@@ -253,12 +262,14 @@ function doPost(e) {
           clearCache(CACHE_KEYS.ADMIN_DASHBOARD);
           clearCache(CACHE_KEYS.USER_DUES(data.user_id));
           clearCache(CACHE_KEYS.USER_DASHBOARD(data.user_id));
+          clearCache(CACHE_KEYS.FINANCIAL_REPORT);
         }
         break;
       case 'updatePaymentStatus':
         data = updatePaymentStatus(payload);
         clearCache(CACHE_KEYS.ALL_DUES);
         clearCache(CACHE_KEYS.ADMIN_DASHBOARD);
+        clearCache(CACHE_KEYS.FINANCIAL_REPORT);
         if (data && data.user_id) {
           clearCache(CACHE_KEYS.USER_DUES(data.user_id));
           clearCache(CACHE_KEYS.USER_DASHBOARD(data.user_id));
@@ -291,6 +302,10 @@ function doPost(e) {
       case 'deleteCCTV':
         data = deleteCCTV(payload.cctvId);
         clearCache(CACHE_KEYS.CCTV_LIST);
+        break;
+      case 'createExpense':
+        data = createExpense(payload);
+        clearCache(CACHE_KEYS.FINANCIAL_REPORT);
         break;
       default:
         return jsonResponse({ error: 'Invalid POST action: ' + action }, false);
@@ -1109,6 +1124,171 @@ function deleteCCTV(cctvId) {
     throw new Error('Camera not found');
 }
 
+// --- FINANCIAL REPORT FUNCTIONS ---
+
+function createExpense(payload) {
+    const { date, category, amount, payee, description } = payload;
+    if (!date || !category || !amount || !payee) {
+        throw new Error("Date, category, amount, and payee are required.");
+    }
+    
+    // Ensure Expenses sheet exists (Lazy creation)
+    let sheet = SS.getSheetByName("Expenses");
+    const headersList = ['expense_id', 'date', 'category', 'amount', 'payee', 'description', 'created_by'];
+    if (!sheet) {
+        sheet = SS.insertSheet("Expenses");
+        sheet.getRange(1, 1, 1, headersList.length).setValues([headersList]).setFontWeight('bold');
+        sheet.setFrozenRows(1);
+    }
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    const newId = 'exp_' + new Date().getTime();
+    const newExpense = {
+        expense_id: newId,
+        date: date,
+        category: category,
+        amount: Number(amount),
+        payee: payee,
+        description: description || '',
+        created_by: 'Admin' 
+    };
+
+    const newRow = headers.map(header => newExpense[String(header).trim()] !== undefined ? newExpense[String(header).trim()] : null);
+    sheet.appendRow(newRow);
+
+    return newExpense;
+}
+
+function getFinancialData() {
+    // 1. Get Expenses
+    const expensesSheet = SS.getSheetByName("Expenses");
+    const expenses = expensesSheet ? sheetToJSON(expensesSheet, ['expense_id', 'amount', 'category']) : [];
+
+    // 2. Get Revenue (Verified Payments)
+    const paymentsSheet = SS.getSheetByName("Payments");
+    const payments = paymentsSheet ? sheetToJSON(paymentsSheet, ['status', 'amount', 'method', 'due_id']) : [];
+    const verifiedPayments = payments.filter(p => p.status === 'verified');
+    
+    // 3. Get Dues (for breakdown and receivables)
+    const duesSheet = SS.getSheetByName("Dues");
+    const dues = duesSheet ? sheetToJSON(duesSheet, ['due_id', 'penalty']) : [];
+    // Join Dues with Users for Receivables List
+    const usersSheet = SS.getSheetByName("Users");
+    const users = sheetToJSON(usersSheet, ['user_id', 'full_name', 'block', 'lot']);
+    
+    // CALCULATIONS
+
+    // Revenue Breakdown
+    let totalRevenue = 0;
+    let incomeFromDues = 0;
+    let incomeFromPenalties = 0;
+    let incomeOther = 0;
+
+    // We need to map payments back to dues to see if it included a penalty
+    // Since payment amount is total, we might have to infer penalty paid if due had penalty
+    // Simplification: Count total verified payment amount as revenue. 
+    // Count total penalty column in *Paid* dues as Penalty Income, rest as Dues.
+    
+    const duesMap = dues.reduce((map, due) => {
+        map[due.due_id] = due;
+        return map;
+    }, {});
+
+    verifiedPayments.forEach(p => {
+        const amount = Number(p.amount) || 0;
+        totalRevenue += amount;
+        
+        const due = duesMap[p.due_id];
+        if (due && Number(due.penalty) > 0) {
+            incomeFromPenalties += Number(due.penalty);
+            incomeFromDues += (amount - Number(due.penalty));
+        } else {
+            incomeFromDues += amount;
+        }
+    });
+
+    // Expense Breakdown
+    let totalExpenses = 0;
+    const expenseBreakdown = {};
+    expenses.forEach(exp => {
+        const amount = Number(exp.amount) || 0;
+        totalExpenses += amount;
+        expenseBreakdown[exp.category] = (expenseBreakdown[exp.category] || 0) + amount;
+    });
+
+    // Cash Position
+    let cashOnHand = 0;
+    let gcash = 0;
+    verifiedPayments.forEach(p => {
+        const amount = Number(p.amount) || 0;
+        if (p.method === 'Cash') cashOnHand += amount;
+        else if (p.method === 'GCash') gcash += amount;
+    });
+    
+    // Subtract expenses from Cash Position (Assuming 'Admin & Office' etc come from Cash/Bank)
+    // For simplicity in this mock, we subtract all expenses from Cash On Hand for now, 
+    // or we could split it proportionally. Let's leave inflow as the "Position" and handle outflow as general deduction for "Ending Balance".
+    // Better logic: Net Cash = Total Cash In - Total Expenses (Assuming expenses paid via cash/check)
+    
+    const netSurplus = totalRevenue - totalExpenses;
+    
+    // Ending Cash Balance = Total Revenue - Total Expenses (Lifetime)
+    const endingCashBalance = netSurplus; 
+
+    // Accounts Receivable
+    // All unpaid or overdue dues
+    const unpaidDues = sheetToJSON(duesSheet, ['due_id', 'user_id', 'total_due', 'status']).filter(d => d.status === 'unpaid' || d.status === 'overdue');
+    let totalReceivables = 0;
+    const receivablesMap = {}; // userId -> { name, unit, amount, count }
+    
+    unpaidDues.forEach(d => {
+        const amount = Number(d.total_due);
+        totalReceivables += amount;
+        
+        if (!receivablesMap[d.user_id]) {
+            const user = users.find(u => u.user_id === d.user_id);
+            receivablesMap[d.user_id] = {
+                name: user ? user.full_name : 'Unknown',
+                unit: user ? `B${user.block} L${user.lot}` : 'N/A',
+                amount: 0,
+                months: 0
+            };
+        }
+        receivablesMap[d.user_id].amount += amount;
+        receivablesMap[d.user_id].months += 1;
+    });
+    
+    const accountsReceivableList = Object.values(receivablesMap);
+
+    // Reserve Fund (Simple calculation: Total of 'Reserve Fund Contribution' expenses + 10% of Surplus if desired)
+    // For now, just sum the expenses categorized as 'Reserve Fund Contribution'
+    const reserveFundTotal = expenseBreakdown['Reserve Fund Contribution'] || 0;
+
+    return {
+        totalRevenue,
+        totalExpenses,
+        netSurplus,
+        endingCashBalance,
+        cashPosition: {
+            cashOnHand: cashOnHand, // Inflow only shown here for "where funds entered"
+            gcash: gcash,
+            bank: 0 
+        },
+        incomeBreakdown: {
+            dues: incomeFromDues,
+            penalties: incomeFromPenalties,
+            other: incomeOther
+        },
+        expenseBreakdown,
+        accountsReceivable: totalReceivables,
+        accountsReceivableList,
+        reserveFundTotal,
+        expensesLedger: expenses.sort((a,b) => new Date(b.date) - new Date(a.date))
+    };
+}
+
+
 // --- UTILITY FUNCTIONS ---
 
 function sheetToJSON(sheet, requiredHeaders = []) {
@@ -1161,6 +1341,7 @@ function setupMockData() {
   const settingsSheet = getOrCreateSheet("Settings");
   const amenityReservationsSheet = getOrCreateSheet("Amenity Reservations");
   const cctvSheet = getOrCreateSheet("CCTV");
+  const expensesSheet = getOrCreateSheet("Expenses");
   
   const today = new Date().toISOString();
 
@@ -1267,6 +1448,18 @@ function setupMockData() {
     cctvSheet.getRange(2, 1, cctvData.length, cctvData[0].length).setValues(cctvData);
   }
   cctvSheet.setFrozenRows(1);
+  
+  // === Set up Expenses sheet ===
+  const expensesHeaders = ['expense_id', 'date', 'category', 'amount', 'payee', 'description', 'created_by'];
+  const expensesData = [
+    ['exp_001', '2023-10-01', 'Security', 15000, 'Eagle Eye Agency', 'Monthly Security Service', 'Admin'],
+    ['exp_002', '2023-10-05', 'Utilities', 3000, 'Meralco', 'Clubhouse Electricity', 'Admin']
+  ];
+  expensesSheet.getRange(1, 1, 1, expensesHeaders.length).setValues([expensesHeaders]).setFontWeight('bold');
+  if (expensesData.length > 0) {
+    expensesSheet.getRange(2, 1, expensesData.length, expensesData[0].length).setValues(expensesData);
+  }
+  expensesSheet.setFrozenRows(1);
 
   SpreadsheetApp.flush();
   Logger.log('Mock data and headers have been set up successfully!');

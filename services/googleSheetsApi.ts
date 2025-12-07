@@ -1,4 +1,5 @@
-import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData, AnnouncementPayload, Payment, CCTV, CCTVPayload } from '../types';
+
+import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData, AnnouncementPayload, Payment, CCTV, CCTVPayload, FinancialReportData, ExpensePayload, Expense } from '../types';
 
 // IMPORTANT: Replace this with your own Google Apps Script Web App URL
 // 1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/1VVSb9V6vLcG97GV6uu7Z0-ok0tfoJh13-V5OLOgzw3I/edit
@@ -57,12 +58,8 @@ export interface UpdatePaymentStatusPayload {
 
 
 const handleApiResponse = async (response: Response) => {
-    // fix: Removed dead code block that checks for a placeholder SCRIPT_URL.
-    // The URL is now configured, making the check and its mock logic obsolete.
     const result = await response.json();
     if (!result.success) {
-        // fix: Correctly parse the nested error message from the backend.
-        // The backend sends errors in the format { success: false, data: { error: '...' } }
         const errorMessage = result.data?.error || 'API request failed';
         throw new Error(errorMessage);
     }
@@ -70,14 +67,8 @@ const handleApiResponse = async (response: Response) => {
 };
 
 export const apiLogin = async (email: string, password: string): Promise<User | null> => {
-    // fix: Removed dead code block with mock login logic.
-    // The SCRIPT_URL is configured, so the app should use the live API.
-
-    // In a real app, never send password in a POST body like this without HTTPS.
-    // Apps Script web apps are served over HTTPS, so this is secure.
     const response = await fetch(SCRIPT_URL, {
         method: 'POST',
-        // Apps Script doPost requires a string body and this specific content type
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'login', payload: { email, password } }),
     });
@@ -265,6 +256,21 @@ export const deleteCCTV = (cctvId: string): Promise<{ success: boolean }> => {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'deleteCCTV', payload: { cctvId } }),
+    });
+    return response.then(handleApiResponse);
+};
+
+// --- FINANCIAL REPORTS API ---
+
+export const getFinancialData = (): Promise<FinancialReportData> => {
+    return fetch(`${SCRIPT_URL}?action=getFinancialData`).then(handleApiResponse);
+};
+
+export const createExpense = (payload: ExpensePayload): Promise<Expense> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'createExpense', payload }),
     });
     return response.then(handleApiResponse);
 };
