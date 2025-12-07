@@ -40,6 +40,9 @@
 //
 // Sheet: Expenses
 // Columns: expense_id, date, category, amount, payee, description, created_by
+//
+// Sheet: Projects
+// Columns: project_id, name, description, status, start_date, end_date, budget, funds_allocated, funds_spent, created_at
 // =================================================================
 
 const SS = SpreadsheetApp.getActiveSpreadsheet();
@@ -87,6 +90,7 @@ const CACHE_KEYS = {
   ALL_RESERVATIONS: 'all_reservations',
   CCTV_LIST: 'cctv_list',
   FINANCIAL_REPORT: 'financial_report',
+  PROJECT_LIST: 'project_list',
   USER_DUES: (userId) => `dues_${userId}`,
   USER_VISITORS: (homeownerId) => `visitors_${homeownerId}`,
   USER_DASHBOARD: (userId) => `dashboard_${userId}`,
@@ -182,6 +186,9 @@ function doGet(e) {
         break;
       case 'getFinancialData':
         data = getCached(CACHE_KEYS.FINANCIAL_REPORT, getFinancialData);
+        break;
+      case 'getProjects':
+        data = getCached(CACHE_KEYS.PROJECT_LIST, getProjects);
         break;
       default:
         return jsonResponse({ error: 'Invalid GET action: ' + action }, false);
@@ -306,6 +313,18 @@ function doPost(e) {
       case 'createExpense':
         data = createExpense(payload);
         clearCache(CACHE_KEYS.FINANCIAL_REPORT);
+        break;
+      case 'createProject':
+        data = createProject(payload);
+        clearCache(CACHE_KEYS.PROJECT_LIST);
+        break;
+      case 'updateProject':
+        data = updateProject(payload);
+        clearCache(CACHE_KEYS.PROJECT_LIST);
+        break;
+      case 'deleteProject':
+        data = deleteProject(payload.projectId);
+        clearCache(CACHE_KEYS.PROJECT_LIST);
         break;
       default:
         return jsonResponse({ error: 'Invalid POST action: ' + action }, false);
@@ -1289,6 +1308,117 @@ function getFinancialData() {
 }
 
 
+// --- PROJECTS / PLANNING FUNCTIONS ---
+
+function getProjects() {
+    const sheet = SS.getSheetByName("Projects");
+    if (!sheet) return [];
+    
+    try {
+        return sheetToJSON(sheet, ['project_id', 'name', 'status']);
+    } catch (e) {
+        Logger.log("Projects sheet exists but is invalid/empty. Returning empty list.");
+        return [];
+    }
+}
+
+function createProject(payload) {
+    const { name, description, status, start_date, end_date, budget, funds_allocated, funds_spent } = payload;
+    if (!name || !status) {
+        throw new Error("Project Name and Status are required.");
+    }
+
+    let sheet = SS.getSheetByName("Projects");
+    const headersList = ['project_id', 'name', 'description', 'status', 'start_date', 'end_date', 'budget', 'funds_allocated', 'funds_spent', 'created_at'];
+
+    // Auto-create sheet if missing
+    if (!sheet) {
+        sheet = SS.insertSheet("Projects");
+        sheet.getRange(1, 1, 1, headersList.length).setValues([headersList]).setFontWeight('bold');
+        sheet.setFrozenRows(1);
+    }
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    const newId = 'proj_' + new Date().getTime();
+    const newProject = {
+        project_id: newId,
+        name: name,
+        description: description || '',
+        status: status,
+        start_date: start_date || '',
+        end_date: end_date || '',
+        budget: Number(budget) || 0,
+        funds_allocated: Number(funds_allocated) || 0,
+        funds_spent: Number(funds_spent) || 0,
+        created_at: new Date().toISOString()
+    };
+
+    const newRow = headers.map(header => newProject[String(header).trim()] !== undefined ? newProject[String(header).trim()] : null);
+    sheet.appendRow(newRow);
+
+    return newProject;
+}
+
+function updateProject(payload) {
+    const { projectId, name, description, status, start_date, end_date, budget, funds_allocated, funds_spent } = payload;
+    if (!projectId) {
+        throw new Error("Project ID is required.");
+    }
+
+    const sheet = getSheetOrThrow("Projects");
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const idIndex = headers.indexOf('project_id');
+
+    const rowIndex = data.findIndex(row => row[idIndex] === projectId);
+
+    if (rowIndex === -1) {
+        throw new Error('Project not found');
+    }
+    
+    const updateMap = {
+        'name': name,
+        'description': description,
+        'status': status,
+        'start_date': start_date,
+        'end_date': end_date,
+        'budget': budget,
+        'funds_allocated': funds_allocated,
+        'funds_spent': funds_spent
+    };
+
+    Object.keys(updateMap).forEach(key => {
+        const colIndex = headers.indexOf(key);
+        if (colIndex !== -1 && updateMap[key] !== undefined) {
+             sheet.getRange(rowIndex + 1, colIndex + 1).setValue(updateMap[key]);
+        }
+    });
+
+    const updatedRow = sheet.getRange(rowIndex + 1, 1, 1, headers.length).getValues()[0];
+    return headers.reduce((obj, header, i) => {
+        obj[header] = updatedRow[i];
+        return obj;
+    }, {});
+}
+
+function deleteProject(payload) {
+    const { projectId } = payload;
+    const sheet = getSheetOrThrow("Projects");
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const idIndex = headers.indexOf('project_id');
+
+    const rowIndex = data.findIndex(row => row[idIndex] === projectId);
+
+    if (rowIndex !== -1) {
+        sheet.deleteRow(rowIndex + 1);
+        return { success: true };
+    }
+    throw new Error('Project not found');
+}
+
+
 // --- UTILITY FUNCTIONS ---
 
 function sheetToJSON(sheet, requiredHeaders = []) {
@@ -1342,6 +1472,7 @@ function setupMockData() {
   const amenityReservationsSheet = getOrCreateSheet("Amenity Reservations");
   const cctvSheet = getOrCreateSheet("CCTV");
   const expensesSheet = getOrCreateSheet("Expenses");
+  const projectsSheet = getOrCreateSheet("Projects");
   
   const today = new Date().toISOString();
 
@@ -1460,6 +1591,18 @@ function setupMockData() {
     expensesSheet.getRange(2, 1, expensesData.length, expensesData[0].length).setValues(expensesData);
   }
   expensesSheet.setFrozenRows(1);
+
+  // === Set up Projects sheet ===
+  const projectsHeaders = ['project_id', 'name', 'description', 'status', 'start_date', 'end_date', 'budget', 'funds_allocated', 'funds_spent', 'created_at'];
+  const projectsData = [
+    ['proj_001', 'Road Repair Phase 1', 'Repair of damaged asphalt on Main Avenue', 'Ongoing', '2023-11-01', '2023-12-15', 500000, 500000, 250000, today],
+    ['proj_002', 'New Basketball Court Lights', 'Installation of LED floodlights', 'Planning', '2024-01-15', '2024-01-30', 75000, 0, 0, today]
+  ];
+  projectsSheet.getRange(1, 1, 1, projectsHeaders.length).setValues([projectsHeaders]).setFontWeight('bold');
+  if (projectsData.length > 0) {
+    projectsSheet.getRange(2, 1, projectsData.length, projectsData[0].length).setValues(projectsData);
+  }
+  projectsSheet.setFrozenRows(1);
 
   SpreadsheetApp.flush();
   Logger.log('Mock data and headers have been set up successfully!');

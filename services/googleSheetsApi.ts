@@ -1,5 +1,5 @@
 
-import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData, AnnouncementPayload, Payment, CCTV, CCTVPayload, FinancialReportData, ExpensePayload, Expense } from '../types';
+import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData, AnnouncementPayload, Payment, CCTV, CCTVPayload, FinancialReportData, ExpensePayload, Expense, Project, ProjectPayload } from '../types';
 
 // IMPORTANT: Replace this with your own Google Apps Script Web App URL
 // 1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/1VVSb9V6vLcG97GV6uu7Z0-ok0tfoJh13-V5OLOgzw3I/edit
@@ -179,7 +179,7 @@ export const recordCashPaymentIntent = (dueId: string): Promise<Payment> => {
         body: JSON.stringify({ action: 'recordCashPaymentIntent', payload: { dueId }})
     });
     return response.then(handleApiResponse);
-}
+};
 
 export const recordAdminCashPayment = (dueId: string): Promise<Payment> => {
     const response = fetch(SCRIPT_URL, {
@@ -271,6 +271,39 @@ export const createExpense = (payload: ExpensePayload): Promise<Expense> => {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'createExpense', payload }),
+    });
+    return response.then(handleApiResponse);
+};
+
+// --- PROJECTS / PLANNING API ---
+
+export const getProjects = (): Promise<Project[]> => {
+    return fetch(`${SCRIPT_URL}?action=getProjects`).then(handleApiResponse);
+};
+
+export const createProject = (payload: ProjectPayload): Promise<Project> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'createProject', payload }),
+    });
+    return response.then(handleApiResponse);
+};
+
+export const updateProject = (projectId: string, payload: ProjectPayload): Promise<Project> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'updateProject', payload: { projectId, ...payload } }),
+    });
+    return response.then(handleApiResponse);
+};
+
+export const deleteProject = (projectId: string): Promise<{ success: boolean }> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'deleteProject', payload: { projectId } }),
     });
     return response.then(handleApiResponse);
 };

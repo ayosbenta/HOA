@@ -167,3 +167,31 @@ export interface FinancialReportData {
     
     expensesLedger: Expense[];
 }
+
+// --- PROJECTS / PLANNING TYPES ---
+
+export type ProjectStatus = 'Planning' | 'Ongoing' | 'Completed' | 'Rejected';
+
+export interface Project {
+    project_id: string;
+    name: string;
+    description: string;
+    status: ProjectStatus;
+    start_date: string;
+    end_date: string;
+    budget: number;
+    funds_allocated: number;
+    funds_spent: number;
+    created_at: string;
+}
+
+export interface ProjectPayload {
+    name: string;
+    description: string;
+    status: string;
+    start_date: string;
+    end_date: string;
+    budget: number;
+    funds_allocated: number;
+    funds_spent: number;
+}
