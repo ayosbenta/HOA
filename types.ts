@@ -64,6 +64,12 @@ export interface Payment {
   notes?: string; // For rejection reason
 }
 
+export interface ProjectContribution extends Payment {
+    project_name: string;
+    homeowner_name: string;
+    homeowner_unit: string;
+}
+
 export interface Visitor {
   visitor_id: string;
   homeowner_id: string; // user_id

@@ -1,5 +1,5 @@
 
-import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData, AnnouncementPayload, Payment, CCTV, CCTVPayload, FinancialReportData, ExpensePayload, Expense, Project, ProjectPayload } from '../types';
+import { User, UserRole, Announcement, Due, Visitor, AmenityReservation, AdminDashboardData, AnnouncementPayload, Payment, CCTV, CCTVPayload, FinancialReportData, ExpensePayload, Expense, Project, ProjectPayload, ProjectContribution } from '../types';
 
 // IMPORTANT: Replace this with your own Google Apps Script Web App URL
 // 1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/1VVSb9V6vLcG97GV6uu7Z0-ok0tfoJh13-V5OLOgzw3I/edit
@@ -172,11 +172,11 @@ export const submitPayment = (payload: PaymentPayload): Promise<Payment> => {
     return response.then(handleApiResponse);
 };
 
-export const recordCashPaymentIntent = (dueId: string): Promise<Payment> => {
+export const recordCashPaymentIntent = (dueId: string, amount?: number): Promise<Payment> => {
     const response = fetch(SCRIPT_URL, {
         method: 'POST',
         headers: {'Content-Type': 'text/plain;charset=utf-8'},
-        body: JSON.stringify({ action: 'recordCashPaymentIntent', payload: { dueId }})
+        body: JSON.stringify({ action: 'recordCashPaymentIntent', payload: { dueId, amount }})
     });
     return response.then(handleApiResponse);
 };
@@ -304,6 +304,19 @@ export const deleteProject = (projectId: string): Promise<{ success: boolean }> 
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'deleteProject', payload: { projectId } }),
+    });
+    return response.then(handleApiResponse);
+};
+
+export const getProjectContributions = (): Promise<ProjectContribution[]> => {
+    return fetch(`${SCRIPT_URL}?action=getProjectContributions`).then(handleApiResponse);
+};
+
+export const createManualProjectContribution = (payload: { projectId: string; userId: string; amount: number }): Promise<Payment> => {
+    const response = fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'createManualProjectContribution', payload }),
     });
     return response.then(handleApiResponse);
 };

@@ -76,6 +76,7 @@ const App: React.FC = () => {
       return [
         ...commonItems,
         { name: 'Billing', icon: CreditCard },
+        { name: 'Projects / Planning', icon: ClipboardList },
         { name: 'Visitors Pass', icon: ShieldCheck },
         { name: 'Amenities', icon: CalendarCheck },
       ];
